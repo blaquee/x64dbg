@@ -22,6 +22,7 @@
 #include "XrefBrowseDialog.h"
 #include "SourceViewerManager.h"
 #include "MiscUtil.h"
+#include "symbolformat.h"
 #include "DataCopyDialog.h"
 #include "SnowmanView.h"
 #include "MemoryPage.h"
@@ -168,16 +169,28 @@ void CPUDisassembly::setupFollowReferenceMenu(dsint wVA, QMenu* menu, bool isRef
                     segment = "fs:";
 #endif //_WIN64
                 if(DbgMemIsValidReadPtr(arg.value))
-                    addFollowReferenceMenuItem(tr("&Address: ") + segment + QString(arg.mnemonic).toUpper().trimmed(), arg.value, menu, isReferences, isFollowInCPU);
+                {
+                    QString valText = "";
+                    auto mnemonic = QString(arg.mnemonic).toUpper().trimmed();
+                    auto symbolicName = getSymbolicName(arg.value, SYM_NOADDR | SYM_ADDRNOEXTEND);
+                    if(symbolicName.contains(mnemonic))
+                        valText = QString("%1").arg(mnemonic);
+                    else
+                        valText = QString("%1 %2").arg(mnemonic, symbolicName);
+                    addFollowReferenceMenuItem(tr("&Address: ") + segment + valText,
+                                               arg.value, menu, isReferences, isFollowInCPU);
+                }
                 if(arg.value != arg.constant)
                 {
-                    QString constant = ToHexString(arg.constant);
                     if(DbgMemIsValidReadPtr(arg.constant))
-                        addFollowReferenceMenuItem(tr("&Constant: ") + constant, arg.constant, menu, isReferences, isFollowInCPU);
+                    {
+                        auto symbolicName = getSymbolicName(arg.constant, SYM_NOADDR);
+                        addFollowReferenceMenuItem(tr("&Constant: ") + symbolicName, arg.constant, menu, isReferences, isFollowInCPU);
+                    }
                 }
                 if(DbgMemIsValidReadPtr(arg.memvalue))
                 {
-                    addFollowReferenceMenuItem(tr("&Value: ") + segment + "[" + QString(arg.mnemonic) + "]", arg.memvalue, menu, isReferences, isFollowInCPU);
+                    addFollowReferenceMenuItem(tr("&Value: ") + segment + "[" + getSymbolicName(arg.memvalue, SYM_NOADDR) + "]", arg.memvalue, menu, isReferences, isFollowInCPU);
                     //Check for switch statement
                     if(memcmp(instr.instruction, "jmp ", 4) == 0 && DbgMemIsValidReadPtr(arg.constant)) //todo: extend check for exact form "jmp [reg*4+disp]"
                     {
@@ -202,8 +215,14 @@ void CPUDisassembly::setupFollowReferenceMenu(dsint wVA, QMenu* menu, bool isRef
             {
                 if(DbgMemIsValidReadPtr(arg.value))
                 {
-                    auto symbolicName = getSymbolicName(arg.value);
-                    QString valText = QString("%1 (%2)").arg(QString(arg.mnemonic).toUpper().trimmed(), symbolicName);
+                    QString valText = "";
+                    auto mnemonic = QString(arg.mnemonic).toUpper().trimmed();
+                    auto symbolicName = getSymbolicName(arg.value, SYM_NOADDR | SYM_ADDRNOEXTEND);
+                    if(symbolicName.contains(mnemonic))
+                        valText = QString("%1").arg(symbolicName);
+                    else
+                        valText = QString("%1 %2").arg(mnemonic, symbolicName);
+
                     addFollowReferenceMenuItem(valText, arg.value, menu, isReferences, isFollowInCPU);
                 }
             }
@@ -218,7 +237,7 @@ void CPUDisassembly::setupFollowReferenceMenu(dsint wVA, QMenu* menu, bool isRef
 
             if(DbgMemIsValidReadPtr(arg.constant))
             {
-                auto symbolicName = getSymbolicName(arg.constant);
+                auto symbolicName = getSymbolicName(arg.constant, SYM_NOADDR);
                 addFollowReferenceMenuItem(tr("Address: ") + symbolicName, arg.constant, menu, isReferences, isFollowInCPU);
             }
             else if(arg.constant)
