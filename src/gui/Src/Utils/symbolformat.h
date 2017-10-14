@@ -13,6 +13,7 @@ static SymbolFlags SYM_STRING           = 1 << 6;
 static SymbolFlags SYM_MODULEWITHADDR = (SYM_ADDRONLY | SYM_NOLABEL);
 static SymbolFlags SYM_MODULEONLY = (SYM_NOLABEL | SYM_NOADDR);
 static SymbolFlags SYM_LABELONLY = (SYM_NOMODULE | SYM_NOADDR);
+//static SymbolFlags SYM_STRING_NOADDR = (SYM_STRING | SYM_NOADDR);
 
 
 
@@ -47,8 +48,35 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
         addrText = ToPtrString(addr);
 
     //if module or label is not available just return addr
-    if((!bHasModule && !bHasLabel) || (flags & SYM_ADDRONLY))
+    if((!bHasModule && !bHasLabel) || (flags & SYM_ADDRONLY) || !(flags & SYM_STRING))
         return addrText;
+
+    //handle strings
+    if(flags & SYM_STRING)
+    {
+        QString finalText = addrText;
+        GuiAddLogMessage("SYM_STRING\n");
+        if(bHasString && (flags & SYM_NOADDR))
+            return QString(stringText);
+        // no other flags
+        else if(bHasString)
+        {
+            //no string but lets see if there are printable characters
+            if(addr == (addr & 0xFF))
+            {
+                QChar c = QChar((char)addr);
+                if(c.isPrint() || c.isSpace())
+                    finalText += QString(" '%1'").arg(EscapeCh(c));
+            }
+            else if(addr == (addr & 0xFFF)) //UNICODE?
+            {
+                QChar c = QChar((ushort)addr);
+                if(c.isPrint() || c.isSpace())
+                    finalText += QString(" L'%1'").arg(EscapeCh(c));
+            }
+        }
+        return finalText;
+    }
 
     if(flags & SYM_NOADDR)
     {
@@ -61,16 +89,6 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
             return QString("%1").arg(moduleText);
         else
             return QString("<%1.%2>").arg(moduleText, labelText);
-    }
-
-    //handle strings
-    if(flags & SYM_STRING)
-    {
-        GuiAddLogMessage("SYM_STRING\n");
-        if(bHasString && (flags & SYM_NOADDR))
-            return QString(stringText);
-        else
-            return QString("%1 %2").arg(addrText, stringText);
     }
 
     //If default is used, attempt to use all available information

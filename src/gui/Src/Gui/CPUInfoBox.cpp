@@ -3,6 +3,7 @@
 #include "WordEditDialog.h"
 #include "XrefBrowseDialog.h"
 #include "Bridge.h"
+#include "symbolformat.h"
 
 CPUInfoBox::CPUInfoBox(StdTable* parent) : StdTable(parent)
 {
@@ -81,6 +82,7 @@ void CPUInfoBox::clear()
     setInfoLine(3, "");
 }
 
+/* Comment out for now until we know the new version works flawlessly.
 QString CPUInfoBox::getSymbolicName(dsint addr)
 {
     char labelText[MAX_LABEL_SIZE] = "";
@@ -117,6 +119,7 @@ QString CPUInfoBox::getSymbolicName(dsint addr)
     }
     return finalText;
 }
+*/
 
 void CPUInfoBox::disasmSelectionChanged(dsint parVA)
 {
