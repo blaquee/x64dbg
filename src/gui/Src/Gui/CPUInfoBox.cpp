@@ -167,11 +167,14 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
             bool ok;
             argMnemonic.toULongLong(&ok, 16);
             QString valText = DbgMemIsValidReadPtr(arg.value) ? ToPtrString(arg.value) : ToHexString(arg.value);
-            auto valTextSym = getSymbolicName(arg.value);
-            if(!valTextSym.contains(valText))
+            auto valTextSym = getSymbolicName(arg.value, SYM_STRING | SYM_NOMODULE | SYM_ADDRNOEXTEND);
+            QString print = QString("Text Symbol 1: %1\t Value: %2\n").arg(valTextSym, getSymbolicName(arg.value, SYM_ADDRONLY | SYM_ADDRNOEXTEND));
+            GuiAddLogMessage(print.toUtf8().constData());
+            if(!valTextSym.contains(getSymbolicName(arg.value, SYM_ADDRONLY | SYM_ADDRNOEXTEND)))
                 valText = QString("%1 %2").arg(valText, valTextSym);
             else
                 valText = valTextSym;
+
             argMnemonic = !ok ? QString("%1]=[%2").arg(argMnemonic).arg(valText) : valText;
             QString sizeName = "";
             int memsize = basicinfo.memory.size;
@@ -220,19 +223,26 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
                 setInfoLine(j, sizeName + "[" + argMnemonic + "]=???");
             else
             {
-                QString addrText = getSymbolicName(arg.memvalue);
+                QString addrText = getSymbolicName(arg.memvalue, SYM_STRING | SYM_ADDRNOEXTEND);
+                GuiAddLogMessage(QString("Processing arg mnemonic: %1\tString: %2\n").arg(argMnemonic, addrText).toUtf8().constData());
                 setInfoLine(j, sizeName + "[" + argMnemonic + "]=" + addrText);
             }
             j++;
         }
         else
         {
-            QString valText = DbgMemIsValidReadPtr(arg.value) ? ToPtrString(arg.value) : ToHexString(arg.value);
-            auto symbolicName = getSymbolicName(arg.value);
-            if(!symbolicName.contains(valText))
+            // QString valText = DbgMemIsValidReadPtr(arg.value) ? ToPtrString(arg.value) : ToHexString(arg.value);
+            auto symbolicName = getSymbolicName(arg.value, SYM_STRING | SYM_ADDRNOEXTEND);
+
+            QString print = QString("Text Symbol 2: %1\t Value: %2\n").arg(symbolicName,
+                                                                           getSymbolicName(arg.value, SYM_ADDRONLY | SYM_ADDRNOEXTEND));
+            GuiAddLogMessage(print.toUtf8().constData());
+            /*
+            if(!symbolicName.contains(getSymbolicName(arg.value, SYM_ADDRONLY | SYM_ADDRNOEXTEND)))
                 valText = QString("%1 (%2)").arg(symbolicName, valText);
             else
                 valText = symbolicName;
+            */
             QString mnemonic(arg.mnemonic);
             bool ok;
             mnemonic.toULongLong(&ok, 16);
@@ -246,7 +256,7 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
                     !mnemonic.startsWith("ymm") &&
                     !mnemonic.startsWith("st"))
             {
-                setInfoLine(j, mnemonic + "=" + valText);
+                setInfoLine(j, mnemonic + "=" + symbolicName);
                 j++;
             }
         }
@@ -518,7 +528,11 @@ void CPUInfoBox::setupFollowMenu(QMenu* menu, duint wVA)
                 segment = "fs:";
 #endif //_WIN64
             if(DbgMemIsValidReadPtr(arg.value))
-                addFollowMenuItem(menu, tr("&Address: ") + segment + QString(arg.mnemonic).toUpper().trimmed(), arg.value);
+            {
+                auto symbolicName = getSymbolicName(arg.value, SYM_DEFAULT | SYM_ADDRNOEXTEND);
+                //QString valText = QString("%1").arg(QString(arg.mnemonic).toUpper().trimmed(), symbolicName);
+                addFollowMenuItem(menu, tr("&Address: ") + segment + symbolicName, arg.value);
+            }
             if(arg.value != arg.constant)
             {
                 QString constant = QString("%1").arg(ToHexString(arg.constant));
@@ -531,7 +545,10 @@ void CPUInfoBox::setupFollowMenu(QMenu* menu, duint wVA)
         else
         {
             if(DbgMemIsValidReadPtr(arg.value))
-                addFollowMenuItem(menu, QString(arg.mnemonic).toUpper().trimmed(), arg.value);
+            {
+                auto symbolicName = getSymbolicName(arg.value, SYM_DEFAULT | SYM_ADDRNOEXTEND);
+                addFollowMenuItem(menu, symbolicName, arg.value);
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ static SymbolFlags SYM_STRING           = 1 << 6;
 static SymbolFlags SYM_MODULEWITHADDR = (SYM_ADDRONLY | SYM_NOLABEL);
 static SymbolFlags SYM_MODULEONLY = (SYM_NOLABEL | SYM_NOADDR);
 static SymbolFlags SYM_LABELONLY = (SYM_NOMODULE | SYM_NOADDR);
+//static SymbolFlags SYM_STRING_NOLABEL = (SYM_STRING | SYM_NOLABEL);
 //static SymbolFlags SYM_STRING_NOADDR = (SYM_STRING | SYM_NOADDR);
 
 
@@ -23,7 +24,7 @@ static SymbolFlags SYM_LABELONLY = (SYM_NOMODULE | SYM_NOADDR);
  * SYM_NOLABEL = 'addr <module (.addr?) >'
  * SYM_ADDRONLY = 'addr'
  * SYM_NOADDR = '<module.label>' only, if module doesnt exist '<addr.label>',
- * SYM_STRING = 'addr string', if SYM_NOADDR then 'string'
+ * SYM_STRING = 'addr string', if SYM_NOADDR then 'string' else return SYM_NOADDR behavior
  * if label doesnt exist '<module.addr>'
  * For any combination that requests module or label, if either one does not exist
  * then addr is the default fallback.
@@ -40,7 +41,6 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
     bool bHasLabel = DbgGetLabelAt(addr, SEG_DEFAULT, labelText);
     bool bHasModule = (DbgGetModuleAt(addr, moduleText) && !QString(labelText).startsWith("JMP.&"));
     QString addrText = "";
-    QString finalText = "";
 
     if(flags & SYM_ADDRNOEXTEND)
         addrText = ToHexString(addr);
@@ -51,16 +51,78 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
     if((!bHasModule && !bHasLabel) || (flags & SYM_ADDRONLY) || !(flags & SYM_STRING))
         return addrText;
 
-    //handle strings
+    // handle special case for strings
     if(flags & SYM_STRING)
     {
-        QString finalText = addrText;
-        GuiAddLogMessage("SYM_STRING\n");
-        if(bHasString && (flags & SYM_NOADDR))
-            return QString(stringText);
-        // no other flags
-        else if(bHasString)
+        //find possible combinations
+        bool bNoLabelFlag = (flags & SYM_NOLABEL);
+        bool bNoAddrFlag = (flags & SYM_NOADDR);
+        bool bNoModuleFlag = (flags & SYM_NOMODULE);
+        QString prt = QString("NoLabel: %1\nNoAddr: %2\nNoModule: %3\n").arg(bNoLabelFlag).
+                                                                       arg(bNoAddrFlag).
+                                                                       arg(bNoModuleFlag);
+        GuiAddLogMessage(prt.toUtf8().constData());
+
+        QString finalText = "";
+        if(!bNoAddrFlag)
+            finalText = addrText + " ";
+
+        // if a string exists, we only want to return that as its the priority
+        if(bHasString)
         {
+            GuiAddLogMessage("In hasString\n");
+            if(bNoAddrFlag)
+            {
+                finalText = stringText;
+            }
+            else
+            {
+                finalText += stringText;
+                //GuiAddLogMessage(finalText.toUtf8().constData());
+            }
+            return finalText;
+        }
+        // if module and label exist, check for flags to omit each
+        /*
+        else if(bHasLabel && bHasModule)
+        {
+            GuiAddLogMessage("No String, check label and module\n");
+            if(bNoLabelFlag)
+            {
+                GuiAddLogMessage("bNoLabelFalg\n");
+                // no label, module.addr
+                finalText = QString("%1.%2").arg(moduleText).arg(addrText);
+            }
+            else if (bNoModuleFlag)
+            {
+                GuiAddLogMessage("bNoModuleFlag\n");
+                // no module. addr <label>
+                finalText += QString("<%1>").arg(labelText);
+            }
+            else // addr <module.label>
+                finalText += QString("<%1.%2>").arg(moduleText).arg(labelText);
+            GuiAddLogMessage("Returning in haslabel + model\n");
+            return finalText;
+        }
+        */
+
+        else if(bHasModule) //module.addr
+        {
+            if(!bNoLabelFlag && bHasLabel)
+                finalText = QString("%1.%2").arg(moduleText).arg(labelText);
+            else
+                finalText = QString("%1.%2").arg(moduleText).arg(addrText);
+        }
+        else if(bHasLabel) //<label>
+        {
+            if(!bNoLabelFlag)
+                finalText = QString("<%1>").arg(labelText);
+            else
+                finalText = addrText;
+        }
+        else
+        {
+            GuiAddLogMessage("Character check\n");
             //no string but lets see if there are printable characters
             if(addr == (addr & 0xFF))
             {
@@ -102,6 +164,7 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
             return addrText;
     }
 
+    // no label
     if(flags & SYM_NOLABEL)
     {
         GuiAddLogMessage("SYM_NOLABEL\n");
@@ -113,6 +176,7 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
         return QString("%1 <%2.%3>").arg(addrText, moduleText, addrText);
     }
 
+    // no module
     if(flags & SYM_NOMODULE)
     {
         GuiAddLogMessage("SYM_NOMODULE\n");
@@ -124,6 +188,7 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
         return QString("%1 <%2>").arg(addrText, labelText);
     }
 
+    // module only
     if(flags & SYM_MODULEONLY)
     {
         //if no module text, return addr
@@ -132,6 +197,7 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
         return QString("%1").arg(moduleText);
     }
 
+    // label only
     if(flags & SYM_LABELONLY)
     {
         if(!bHasLabel)
@@ -139,6 +205,7 @@ static QString getSymbolicName(duint addr, SymbolFlags flags)
         return QString("<%1>").arg(labelText);
     }
 
+    // module with address
     if(flags & SYM_MODULEWITHADDR)
     {
         if(!bHasModule)
