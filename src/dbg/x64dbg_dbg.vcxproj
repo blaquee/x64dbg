@@ -67,6 +67,120 @@
     <ClCompile Include="datainst_helper.cpp" />
     <ClCompile Include="dbghelp_safe.cpp" />
     <ClCompile Include="debugger.cpp" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_abbrev.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_alloc.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_arange.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_die_deliv.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_elf_access.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_errmsg_list.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_error.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_form.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_frame.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_frame2.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_frame3.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_funcs.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_gdbindex.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_global.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_harmless.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_init_finish.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_leb.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_line.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_line2.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_loc.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_loc2.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_macro.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_macro5.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_names.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_original_elf_init.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_print_lines.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_pubtypes.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_query.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_ranges.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_sort_line.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_string.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_stubs.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_tied.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_tsearchhash.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_types.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_util.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_vars.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_weaks.c" />
+    <ClCompile Include="dwarf\libdwarf\dwarf_xu_index.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_alloc.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_arange.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_die.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_encode_nm.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_error.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_expr.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_finish.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_forms.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_frame.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_funcs.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_init.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_line.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_macinfo.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_pubnames.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_reloc.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_reloc_stream.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_reloc_symbolic.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_section.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_types.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_vars.c" />
+    <ClCompile Include="dwarf\libdwarf\pro_weaks.c" />
+    <ClCompile Include="dwarf\libelf\32.fsize.c" />
+    <ClCompile Include="dwarf\libelf\32.getehdr.c" />
+    <ClCompile Include="dwarf\libelf\32.getphdr.c" />
+    <ClCompile Include="dwarf\libelf\32.getshdr.c" />
+    <ClCompile Include="dwarf\libelf\32.newehdr.c" />
+    <ClCompile Include="dwarf\libelf\32.newphdr.c" />
+    <ClCompile Include="dwarf\libelf\32.xlatetof.c" />
+    <ClCompile Include="dwarf\libelf\64.xlatetof.c" />
+    <ClCompile Include="dwarf\libelf\assert.c" />
+    <ClCompile Include="dwarf\libelf\begin.c" />
+    <ClCompile Include="dwarf\libelf\checksum.c" />
+    <ClCompile Include="dwarf\libelf\cntl.c" />
+    <ClCompile Include="dwarf\libelf\cook.c" />
+    <ClCompile Include="dwarf\libelf\data.c" />
+    <ClCompile Include="dwarf\libelf\end.c" />
+    <ClCompile Include="dwarf\libelf\errmsg.c" />
+    <ClCompile Include="dwarf\libelf\errno.c" />
+    <ClCompile Include="dwarf\libelf\fill.c" />
+    <ClCompile Include="dwarf\libelf\flag.c" />
+    <ClCompile Include="dwarf\libelf\gelfehdr.c" />
+    <ClCompile Include="dwarf\libelf\gelfphdr.c" />
+    <ClCompile Include="dwarf\libelf\gelfshdr.c" />
+    <ClCompile Include="dwarf\libelf\gelftrans.c" />
+    <ClCompile Include="dwarf\libelf\getarhdr.c" />
+    <ClCompile Include="dwarf\libelf\getarsym.c" />
+    <ClCompile Include="dwarf\libelf\getbase.c" />
+    <ClCompile Include="dwarf\libelf\getdata.c" />
+    <ClCompile Include="dwarf\libelf\getident.c" />
+    <ClCompile Include="dwarf\libelf\getscn.c" />
+    <ClCompile Include="dwarf\libelf\hash.c" />
+    <ClCompile Include="dwarf\libelf\input.c" />
+    <ClCompile Include="dwarf\libelf\kind.c" />
+    <ClCompile Include="dwarf\libelf\memset.c" />
+    <ClCompile Include="dwarf\libelf\ndxscn.c" />
+    <ClCompile Include="dwarf\libelf\newdata.c" />
+    <ClCompile Include="dwarf\libelf\newscn.c" />
+    <ClCompile Include="dwarf\libelf\next.c" />
+    <ClCompile Include="dwarf\libelf\nextscn.c" />
+    <ClCompile Include="dwarf\libelf\nlist.c" />
+    <ClCompile Include="dwarf\libelf\opt.delscn.c" />
+    <ClCompile Include="dwarf\libelf\rand.c" />
+    <ClCompile Include="dwarf\libelf\rawdata.c" />
+    <ClCompile Include="dwarf\libelf\rawfile.c" />
+    <ClCompile Include="dwarf\libelf\strptr.c" />
+    <ClCompile Include="dwarf\libelf\swap64.c" />
+    <ClCompile Include="dwarf\libelf\update.c" />
+    <ClCompile Include="dwarf\libelf\verdef_32_tof.c" />
+    <ClCompile Include="dwarf\libelf\verdef_32_tom.c" />
+    <ClCompile Include="dwarf\libelf\verdef_64_tof.c" />
+    <ClCompile Include="dwarf\libelf\verdef_64_tom.c" />
+    <ClCompile Include="dwarf\libelf\version.c" />
+    <ClCompile Include="dwarf\libelf\x.elfext.c" />
+    <ClCompile Include="dwarf\libelf\x.movscn.c" />
+    <ClCompile Include="dwarf\libelf\x.remscn.c" />
     <ClCompile Include="encodemap.cpp" />
     <ClCompile Include="disasm_fast.cpp" />
     <ClCompile Include="disasm_helper.cpp" />
@@ -101,6 +215,7 @@
     <ClCompile Include="stringutils.cpp" />
     <ClCompile Include="symbolinfo.cpp" />
     <ClCompile Include="symbolsourcedia.cpp" />
+    <ClCompile Include="symbolsourcedwarf.h" />
     <ClCompile Include="symcache.cpp" />
     <ClCompile Include="tcpconnections.cpp" />
     <ClCompile Include="thread.cpp" />
@@ -193,6 +308,71 @@
     <ClInclude Include="debugger.h" />
     <ClInclude Include="debugger_cookie.h" />
     <ClInclude Include="debugger_tracing.h" />
+    <ClInclude Include="dwarf\libdwarf\config.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_abbrev.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_alloc.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_arange.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_base_types.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_die_deliv.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_elf_access.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_error.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_frame.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_funcs.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_gdbindex.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_global.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_harmless.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_incl.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_line.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_loc.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_macro.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_macro5.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_names.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_names_enum.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_names_new.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_opaque.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_reloc_arm.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_reloc_mips.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_reloc_ppc.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_reloc_ppc64.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_reloc_x86_64.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_tsearch.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_types.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_util.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_vars.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_weaks.h" />
+    <ClInclude Include="dwarf\libdwarf\dwarf_xu_index.h" />
+    <ClInclude Include="dwarf\libdwarf\libdwarf.h" />
+    <ClInclude Include="dwarf\libdwarf\libdwarfdefs.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_alloc.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_arange.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_die.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_encode_nm.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_error.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_expr.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_frame.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_incl.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_line.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_macinfo.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_opaque.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_reloc.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_reloc_stream.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_reloc_symbolic.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_section.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_types.h" />
+    <ClInclude Include="dwarf\libdwarf\pro_util.h" />
+    <ClInclude Include="dwarf\libelf\byteswap.h" />
+    <ClInclude Include="dwarf\libelf\config.h" />
+    <ClInclude Include="dwarf\libelf\elf_repl.h" />
+    <ClInclude Include="dwarf\libelf\errors.h" />
+    <ClInclude Include="dwarf\libelf\ext_types.h" />
+    <ClInclude Include="dwarf\libelf\gelf.h" />
+    <ClInclude Include="dwarf\libelf\libelf.h" />
+    <ClInclude Include="dwarf\libelf\nlist.h" />
+    <ClInclude Include="dwarf\libelf\private.h" />
+    <ClInclude Include="dwarf\libelf\sys_elf.h" />
+    <ClInclude Include="dwarf\libelf\verdef.h" />
+    <ClInclude Include="dwarf\libelf\verneed.h" />
     <ClInclude Include="encodemap.h" />
     <ClInclude Include="DeviceNameResolver\DeviceNameResolver.h" />
     <ClInclude Include="disasm_fast.h" />
@@ -372,26 +552,26 @@
     <OutDir>$(ProjectDir)..\..\bin\x32\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <TargetName>x32dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x32d\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <TargetName>x32dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x64\</OutDir>
     <TargetName>x64dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x64d\</OutDir>
     <TargetName>x64dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
