@@ -5,7 +5,6 @@
 #include "Bridge.h"
 #include "YaraRuleSelectionDialog.h"
 #include "EntropyDialog.h"
-#include "LineEditDialog.h"
 #include "BrowseDialog.h"
 #include "StdSearchListView.h"
 #include "ZehSymbolTable.h"
@@ -21,7 +20,11 @@ public:
     SymbolSearchList()
     {
         mList = new ZehSymbolTable();
+        mList->setAddressColumn(0);
+        mList->setAddressLabel(false);
         mSearchList = new ZehSymbolTable();
+        mSearchList->setAddressColumn(0);
+        mSearchList->setAddressLabel(false);
     }
 
     void lock() override
@@ -549,12 +552,13 @@ void SymbolView::moduleContextMenu(QMenu* wMenu)
 
 void SymbolView::moduleFollow()
 {
-    DbgCmdExecDirect(QString("disasm " + mModuleList->mCurList->getCellContent(mModuleList->mCurList->getInitialSelection(), 0) + "+1000").toUtf8().constData());
+    DbgCmdExec(QString("disasm " + mModuleList->mCurList->getCellContent(mModuleList->mCurList->getInitialSelection(), 0) + "+1000").toUtf8().constData());
 }
 
 void SymbolView::moduleEntryFollow()
 {
-    DbgCmdExecDirect(QString("disasm " + mModuleList->mCurList->getCellContent(mModuleList->mCurList->getInitialSelection(), 1) + ":entry").toUtf8().constData());
+    //Test case: libstdc++-6.dll
+    DbgCmdExec(QString("disasm \"" + mModuleList->mCurList->getCellContent(mModuleList->mCurList->getInitialSelection(), 1) + "\":entry").toUtf8().constData());
 }
 
 void SymbolView::moduleCopyPath()
@@ -609,7 +613,6 @@ void SymbolView::moduleDownloadAllSymbols()
 
 void SymbolView::moduleLoad()
 {
-    QString cmd;
     if(!DbgIsDebugging())
         return;
 
@@ -622,7 +625,6 @@ void SymbolView::moduleLoad()
 
 void SymbolView::moduleFree()
 {
-    QString cmd;
     if(!DbgIsDebugging())
         return;
 
@@ -742,18 +744,14 @@ void SymbolView::moduleSetUser()
 
 void SymbolView::moduleSetParty()
 {
-    LineEditDialog mLineEdit(this);
     int party;
     duint modbase = DbgValFromString(mModuleList->mCurList->getCellContent(mModuleList->mCurList->getInitialSelection(), 0).toUtf8().constData());
     party = DbgFunctions()->ModGetParty(modbase);
-    mLineEdit.setWindowIcon(DIcon("bookmark.png"));
-    mLineEdit.setWindowTitle(tr("Mark the party of the module as"));
-    mLineEdit.setText(QString::number(party));
-    mLineEdit.setPlaceholderText(tr("0 is user module, 1 is system module."));
-    if(mLineEdit.exec() == QDialog::Accepted)
+    QString mLineEditeditText;
+    if(SimpleInputBox(this, tr("Mark the party of the module as"), QString::number(party), mLineEditeditText, tr("0 is user module, 1 is system module."), &DIcon("bookmark.png")))
     {
         bool ok;
-        party = mLineEdit.editText.toInt(&ok);
+        party = mLineEditeditText.toInt(&ok);
         int i = mModuleList->mCurList->getInitialSelection();
         if(ok)
         {
@@ -774,11 +772,7 @@ void SymbolView::moduleSetParty()
             mModuleList->mCurList->reloadData();*/
         }
         else
-        {
-            QMessageBox msg(QMessageBox::Critical, tr("Error"), tr("The party number can only be an integer"));
-            msg.setWindowIcon(DIcon("compile-error.png"));
-            msg.exec();
-        }
+            SimpleErrorBox(this, tr("Error"), tr("The party number can only be an integer"));
     }
 }
 

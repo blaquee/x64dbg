@@ -193,6 +193,53 @@ bool BpGet(duint Address, BP_TYPE Type, const char* Name, BREAKPOINT* Bp)
         return true;
     }
 
+    // If name in a special format "libwinpthread-1.dll":$7792, find the breakpoint even if the DLL might not be loaded yet.
+    const char* separatorPos;
+    separatorPos = strstr(Name, ":$"); //DLL file names cannot contain ":" char anyway, so ignoring the quotes is fine. The following part of RVA expression might contain ":$"?
+    if(separatorPos && Type != BPDLL && Type != BPEXCEPTION)
+    {
+        char* DLLName = _strdup(Name);
+        char* RVAPos = DLLName + (separatorPos - Name);
+        RVAPos[0] = RVAPos[1] = '\0';
+        RVAPos = RVAPos + 2; //Now 2 strings separated by NULs
+        if(valfromstring(RVAPos, &Address)) //"Address" reused here. No usage of original "Address" argument.
+        {
+            if(separatorPos != Name)   //Check if DLL name is surrounded by quotes. Don't be out of bounds!
+            {
+                if(DLLName[0] == '"' && RVAPos[-3] == '"')
+                {
+                    RVAPos[-3] = '\0';
+                    DLLName[0] = '\0';
+                }
+            }
+            if(DLLName[0] != '\0')
+            {
+                duint base = ModBaseFromName(DLLName); //Is the DLL actually loaded?
+                Address += base ? base : ModHashFromName(DLLName);
+            }
+            else
+            {
+                duint base = ModBaseFromName(DLLName + 1);
+                Address += base ? base : ModHashFromName(DLLName + 1);
+            }
+
+            // Perform a lookup by address only
+            BREAKPOINT* bpInfo = BpInfoFromAddr(Type, Address);
+
+            if(!bpInfo)
+                return false;
+
+            // Succeed even if the user didn't request anything
+            if(!Bp)
+                return true;
+
+            *Bp = *bpInfo;
+            Bp->addr = Address;
+            setBpActive(*Bp);
+            return true;
+        }
+        free(DLLName);
+    }
     return false;
 }
 
@@ -228,12 +275,13 @@ bool BpUpdateDllPath(const char* module1, BREAKPOINT** newBpInfo)
     EXCLUSIVE_ACQUIRE(LockBreakpoints);
     for(auto & i : breakpoints)
     {
-        if(i.second.type == BPDLL && i.second.enabled)
+        BREAKPOINT & bpRef = i.second;
+        if(bpRef.type == BPDLL && bpRef.enabled)
         {
-            if(_stricmp(i.second.mod, module1) == 0)
+            if(_stricmp(bpRef.mod, module1) == 0)
             {
                 BREAKPOINT temp;
-                temp = i.second;
+                temp = bpRef;
                 strcpy_s(temp.mod, module1);
                 temp.addr = ModHashFromName(module1);
                 breakpoints.erase(i.first);
@@ -241,15 +289,15 @@ bool BpUpdateDllPath(const char* module1, BREAKPOINT** newBpInfo)
                 *newBpInfo = &newItem.first->second;
                 return true;
             }
-            const char* dashPos = max(strrchr(i.second.mod, '\\'), strrchr(i.second.mod, '/'));
+            const char* dashPos = max(strrchr(bpRef.mod, '\\'), strrchr(bpRef.mod, '/'));
             if(dashPos == nullptr)
-                dashPos = i.second.mod;
+                dashPos = bpRef.mod;
             else
                 dashPos += 1;
             if(dashPos1 != nullptr && _stricmp(dashPos, dashPos1 + 1) == 0) // filename matches
             {
                 BREAKPOINT temp;
-                temp = i.second;
+                temp = bpRef;
                 strcpy_s(temp.mod, dashPos1 + 1);
                 temp.addr = ModHashFromName(dashPos1 + 1);
                 breakpoints.erase(i.first);

@@ -1496,15 +1496,9 @@ void CPUDisassembly::pushSelectionInto(bool copyBytes, QTextStream & stream, QTe
         duint cur_addr = rvaToVa(inst.rva);
         QString address = getAddrText(cur_addr, 0, addressLen > sizeof(duint) * 2 + 1);
         QString bytes;
+        QString bytesHtml;
         if(copyBytes)
-        {
-            for(int j = 0; j < inst.dump.size(); j++)
-            {
-                if(j)
-                    bytes += " ";
-                bytes += ToByteString((unsigned char)(inst.dump.at(j)));
-            }
-        }
+            RichTextPainter::htmlRichText(getRichBytes(inst), bytesHtml, bytes);
         QString disassembly;
         QString htmlDisassembly;
         if(htmlStream)
@@ -1754,9 +1748,10 @@ void CPUDisassembly::openSourceSlot()
 {
     char szSourceFile[MAX_STRING_SIZE] = "";
     int line = 0;
-    if(!DbgFunctions()->GetSourceFromAddr(rvaToVa(getInitialSelection()), szSourceFile, &line))
+    auto sel = rvaToVa(getInitialSelection());
+    if(!DbgFunctions()->GetSourceFromAddr(sel, szSourceFile, &line))
         return;
-    emit Bridge::getBridge()->loadSourceFile(szSourceFile, 0, line);
+    emit Bridge::getBridge()->loadSourceFile(szSourceFile, sel);
     emit displaySourceManagerWidget();
 }
 

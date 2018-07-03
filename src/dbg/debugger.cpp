@@ -78,7 +78,7 @@ PROCESS_INFORMATION* fdProcessInfo = &g_pi;
 HANDLE hActiveThread;
 HANDLE hProcessToken;
 bool bUndecorateSymbolNames = true;
-bool bEnableSourceDebugging = true;
+bool bEnableSourceDebugging = false;
 bool bTraceRecordEnabledDuringTrace = true;
 bool bSkipInt3Stepping = false;
 bool bIgnoreInconsistentBreakpoints = false;
@@ -463,7 +463,7 @@ void DebugUpdateGui(duint disasm_addr, bool stack)
             char szSourceFile[MAX_STRING_SIZE] = "";
             int line = 0;
             if(SymGetSourceLine(cip, szSourceFile, &line))
-                GuiLoadSourceFile(szSourceFile, line);
+                GuiLoadSourceFileEx(szSourceFile, cip);
         }
         GuiDisasmAt(disasm_addr, cip);
     }
@@ -1142,6 +1142,14 @@ void cbStep()
 {
     hActiveThread = ThreadGetHandle(((DEBUG_EVENT*)GetDebugData())->dwThreadId);
     duint CIP = GetContextDataEx(hActiveThread, UE_CIP);
+
+    // Do not step if there is an enable breakpoint at CIP
+    BREAKPOINT bp;
+    if((BpGet(CIP, BPNORMAL, nullptr, &bp) && bp.enabled))
+        return;
+    if(BpGet(CIP, BPHARDWARE, nullptr, &bp) && bp.enabled && TITANGETTYPE(bp.titantype) == UE_HARDWARE_EXECUTE)
+        return;
+
     if(!stepRepeat || !--stepRepeat)
     {
         DebugUpdateGuiSetStateAsync(CIP, true);
@@ -1780,7 +1788,6 @@ static void cbUnloadDll(UNLOAD_DLL_DEBUG_INFO* UnloadDll)
 
 static void cbOutputDebugString(OUTPUT_DEBUG_STRING_INFO* DebugString)
 {
-
     hActiveThread = ThreadGetHandle(((DEBUG_EVENT*)GetDebugData())->dwThreadId);
     PLUG_CB_OUTPUTDEBUGSTRING callbackInfo;
     callbackInfo.DebugString = DebugString;
@@ -1795,12 +1802,16 @@ static void cbOutputDebugString(OUTPUT_DEBUG_STRING_INFO* DebugString)
             if(str != lastDebugText) //fix for every string being printed twice
             {
                 if(str != "\n")
-                    dprintf(QT_TRANSLATE_NOOP("DBG", "DebugString: \"%s\"\n"), StringUtils::Escape(str).c_str());
+                    dprintf(QT_TRANSLATE_NOOP("DBG", "DebugString: \"%s\"\n"), StringUtils::Escape(str, false).c_str());
                 lastDebugText = str;
             }
             else
                 lastDebugText.clear();
         }
+    }
+    else
+    {
+        //TODO: implement Windows 10 unicode debug string
     }
 
     if(settingboolget("Events", "DebugStrings"))
@@ -2576,9 +2587,7 @@ static void debugLoopFunction(void* lpParameter, bool attach)
         {
             auto lastError = GetLastError();
             auto isElevated = IsProcessElevated();
-            auto error = ErrorCodeToName(lastError);
-            if(error.empty())
-                error = StringUtils::sprintf("%d (0x%X)", lastError);
+            String error = stringformatinline(StringUtils::sprintf("{winerror@%d}", lastError));
             if(lastError == ERROR_ELEVATION_REQUIRED && !isElevated)
             {
                 auto msg = StringUtils::Utf8ToUtf16(GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "The executable you are trying to debug requires elevation. Restart as admin?")));
@@ -2678,8 +2687,8 @@ static void debugLoopFunction(void* lpParameter, bool attach)
     {
         if(AttachDebugger(pid, true, fdProcessInfo, (void*)cbAttachDebugger) == false)
         {
-            unsigned int errorCode = GetLastError();
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Attach to process failed! GetLastError() = %d (%s)\n"), int(errorCode), ErrorCodeToName(errorCode).c_str());
+            String error = stringformatinline(StringUtils::sprintf("{winerror@%d}", GetLastError()));
+            dprintf(QT_TRANSLATE_NOOP("DBG", "Attach to process failed! GetLastError() = %s\n"), error.c_str());
         }
     }
     else

@@ -19,11 +19,6 @@
         ? ((PIMAGE_THUNK_DATA32)(Ptr))->Val \
         : 0))
 
-#define FILE_HEADER_FIELD(NtHeaders, Field) (IMAGE64(NtHeaders) \
-	? ((PIMAGE_NT_HEADERS64)(NtHeaders))->FileHeader.Field : (IMAGE32(NtHeaders) \
-		? ((PIMAGE_NT_HEADERS32)(NtHeaders))->FileHeader.Field \
-		: 0))
-
 struct MODSECTIONINFO
 {
     duint addr; // Virtual address
@@ -89,9 +84,6 @@ struct MODINFO
     char path[MAX_PATH]; // File path (in UTF8)
 
     PIMAGE_NT_HEADERS headers = nullptr; // Image headers. Always use HEADER_FIELD() to access OptionalHeader values
-	PIMAGE_SYMBOL symbolTablePtr = nullptr; // Use this to partly determine existence of symbol table for Dwarf processing (string table exists after this table)
-	size_t numOfSymbols = 0; // ^^
-	PSTR stringTablePtr = nullptr;
 
     std::vector<MODSECTIONINFO> sections;
     std::vector<MODRELOCATIONINFO> relocations;
@@ -130,6 +122,7 @@ struct MODINFO
     {
         unmapFile();
         unloadSymbols();
+        GuiInvalidateSymbolSource(base);
     }
 
     bool loadSymbols();

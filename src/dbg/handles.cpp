@@ -58,7 +58,7 @@ static DWORD WINAPI getNameThread(LPVOID lpParam)
 bool HandlesGetName(HANDLE hProcess, HANDLE remoteHandle, String & name, String & typeName)
 {
     HANDLE hLocalHandle;
-    if(DuplicateHandle(hProcess, remoteHandle, GetCurrentProcess(), &hLocalHandle, 0, FALSE, 0))
+    if(DuplicateHandle(hProcess, remoteHandle, GetCurrentProcess(), &hLocalHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) //Needs privileges for PID/TID retrival
     {
         ULONG ReturnSize = 0;
         if(NtQueryObject(hLocalHandle, ObjectTypeInformation, nullptr, 0, &ReturnSize) == STATUS_INFO_LENGTH_MISMATCH)
@@ -80,16 +80,75 @@ bool HandlesGetName(HANDLE hProcess, HANDLE remoteHandle, String & name, String 
             }
         };
 
-        auto hThread = CreateThread(nullptr, 0, getNameThread, &getName, 0, nullptr);
-        auto result = WaitForSingleObject(hThread, 200);
-        if(result != WAIT_OBJECT_0)
+        name.clear();
+        if(strcmp(typeName.c_str(), "Process") == 0)
         {
-            TerminateThread(hThread, 0);
-            name = String(ErrorCodeToName(result));
-        }
-        else
-            CloseHandle(hThread);
+            DWORD PID = GetProcessId(hLocalHandle); //Windows XP SP1
+            if(PID == 0) //The first time could fail because the process didn't specify query permissions.
+            {
+                HANDLE hLocalQueryHandle;
+                if(DuplicateHandle(hProcess, remoteHandle, GetCurrentProcess(), &hLocalQueryHandle, PROCESS_QUERY_INFORMATION, FALSE, 0))
+                {
+                    PID = GetProcessId(hLocalQueryHandle);
+                    CloseHandle(hLocalQueryHandle);
+                }
+            }
 
+            if(PID > 0)
+                name = StringUtils::sprintf("PID: %X", PID);
+        }
+        else if(strcmp(typeName.c_str(), "Thread") == 0)
+        {
+            auto getTidPid = [](HANDLE hThread, DWORD & TID, DWORD & PID)
+            {
+                static auto pGetThreadId = (DWORD(__stdcall*)(HANDLE))GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadId");
+                static auto pGetProcessIdOfThread = (DWORD(__stdcall*)(HANDLE))GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetProcessIdOfThread");
+                if(pGetThreadId != NULL && pGetProcessIdOfThread != NULL) //Vista or Server 2003 only
+                {
+                    TID = pGetThreadId(hThread);
+                    PID = pGetProcessIdOfThread(hThread);
+                }
+                else //Windows XP
+                {
+                    THREAD_BASIC_INFORMATION threadInfo;
+                    ULONG threadInfoSize = 0;
+                    NTSTATUS isok = NtQueryInformationThread(hThread, ThreadBasicInformation, &threadInfo, sizeof(threadInfo), &threadInfoSize);
+                    if(NT_SUCCESS(isok))
+                    {
+                        TID = (DWORD)threadInfo.ClientId.UniqueThread;
+                        PID = (DWORD)threadInfo.ClientId.UniqueProcess;
+                    }
+                }
+            };
+
+            DWORD TID, PID;
+            getTidPid(hLocalHandle, TID, PID);
+            if(TID == 0 || PID == 0) //The first time could fail because the process didn't specify query permissions.
+            {
+                HANDLE hLocalQueryHandle;
+                if(DuplicateHandle(hProcess, remoteHandle, GetCurrentProcess(), &hLocalQueryHandle, THREAD_QUERY_INFORMATION, FALSE, 0))
+                {
+                    getTidPid(hLocalQueryHandle, TID, PID);
+                    CloseHandle(hLocalQueryHandle);
+                }
+            }
+
+            if(TID > 0 && PID > 0)
+                name = StringUtils::sprintf("TID: %X, PID: %X", TID, PID);
+        }
+        if(name.empty())
+        {
+            HANDLE hThread;
+            hThread = CreateThread(nullptr, 0, getNameThread, &getName, 0, nullptr);
+            auto result = WaitForSingleObject(hThread, 200);
+            if(result != WAIT_OBJECT_0)
+            {
+                TerminateThread(hThread, 0);
+                name = String(ErrorCodeToName(result));
+            }
+            else
+                CloseHandle(hThread);
+        }
         CloseHandle(hLocalHandle);
     }
     else
