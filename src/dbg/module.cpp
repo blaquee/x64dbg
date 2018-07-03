@@ -551,6 +551,29 @@ void ReadDebugDirectory(MODINFO & Info, ULONG_PTR FileMapVA)
     }
 }
 
+void ReadSymbolInfo(MODINFO & Info, ULONG_PTR FileMapVA)
+{
+	if(!Info.headers || !FileMapVA)
+		return;
+
+	duint symTablePtr = FILE_HEADER_FIELD(Info.headers, PointerToSymbolTable);
+	duint symSize = FILE_HEADER_FIELD(Info.headers, NumberOfSymbols);
+
+	// if no symbol table exist or its size is 0, we can safely assume there is no dwarf data to process or
+	// this binary wasn't built with the mingw toolkit.
+	if(!symTablePtr || symSize == 0) return;
+
+	Info.numOfSymbols = symSize;
+	Info.symbolTablePtr = (PIMAGE_SYMBOL)(Info.headerImageBase + symTablePtr);
+	//check boundaries
+	if(symTablePtr + symSize * sizeof(Info.symbolTablePtr[0]) > Info.size)
+	{
+		dprintf(QT_TRANSLATE_NOOP("DBG", "Symbol Table boundary check failed!\n"));
+		return;
+	}
+	
+}
+
 void GetModuleInfo(MODINFO & Info, ULONG_PTR FileMapVA)
 {
     // Get the PE headers

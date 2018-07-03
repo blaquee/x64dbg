@@ -31,6 +31,7 @@ extern "C" {
 		PSTR pStringTable;
 	}DwarfModuleObject;
 
+
 	//dwarf object helper functions
 	static int PfnGetSectionInfo(void* obj, Dwarf_Half section_index,
 		Dwarf_Obj_Access_Section* return_section, int* err);
@@ -41,7 +42,7 @@ extern "C" {
 		Dwarf_Small ** return_data, int *err);
 
 	//dwarf object methods structure
-	static const Dwarf_Obj_Access_Methods DwarfPeMethods
+	const Dwarf_Obj_Access_Methods DwarfPeMethods
 	{
 		PfnGetSectionInfo,
 		PfnGetByteOrder,
@@ -51,8 +52,10 @@ extern "C" {
 		PfnLoadSection
 	};
 
-	class DwarfPE : public SymbolSourceBase
+	class DwarfSymbolSource : public SymbolSourceBase
 	{
+
+
 	private:
 		Dwarf_Debug dbg;
 		Dwarf_Handler m_ErrHandler;
@@ -64,12 +67,20 @@ extern "C" {
 		bool isInitialized;
 
 		// A Copy from MODINFO
-		HANDLE hFileMapping;
+		//HANDLE hFileMapping;
+		PVOID lpMapBase;
 
+	private:
+		std::vector<SymbolInfo> _symData;
+		std::string _path;
+		std::vector<String> _sourceFiles;
+		duint _imageSize;
+		PIMAGE_NT_HEADERS pNtHeaders;
+		
 	public:
-		DwarfPE(HANDLE hMap) : hFileMapping(hMap){}
-		DwarfPE();
-		virtual ~DwarfPE();
+		DwarfSymbolSource();
+		//DwarfPE();
+		virtual ~DwarfSymbolSource();
 
 		virtual bool isOpen() const override;
 		virtual bool findSymbolExact(duint rva, SymbolInfo & symInfo) override;
@@ -80,7 +91,9 @@ extern "C" {
 		virtual bool findSymbolByName(const std::string & name, SymbolInfo & symInfo, bool caseSensitive) override;
 
 	public:
-		bool initDwarf(const std::string & path, HANDLE hFileMap);
+		bool initDwarf(PVOID lpBase, duint szFileSize); // initializes the dwarf library interface
+		DwarfModuleObject* getDwarfModule();
+
 
 
 	};

@@ -812,6 +812,9 @@
     <ClCompile Include="symbolsourcedwarf.h">
       <Filter>Header Files\Symbols</Filter>
     </ClCompile>
+    <ClCompile Include="symbolsourcedwarf.cpp">
+      <Filter>Source Files\Symbols</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dbghelp\dbghelp.h">
