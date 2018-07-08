@@ -32,7 +32,9 @@ extern "C" {
 	}DwarfModuleObject;
 
 
-	//dwarf object helper functions
+	// dwarf object helper functions
+	// These have to be global because Dwarf lib expects these callbacks for
+	// Dwarf_Obj_Access_Methods
 	static int PfnGetSectionInfo(void* obj, Dwarf_Half section_index,
 		Dwarf_Obj_Access_Section* return_section, int* err);
 	static Dwarf_Endianness PfnGetByteOrder(void* obj);
@@ -66,16 +68,12 @@ extern "C" {
 		bool isDwarf;
 		bool isInitialized;
 
-		// A Copy from MODINFO
-		//HANDLE hFileMapping;
-		PVOID lpMapBase;
 
 	private:
 		std::vector<SymbolInfo> _symData;
 		std::string _path;
 		std::vector<String> _sourceFiles;
 		duint _imageSize;
-		PIMAGE_NT_HEADERS pNtHeaders;
 		
 	public:
 		DwarfSymbolSource();
@@ -91,8 +89,9 @@ extern "C" {
 		virtual bool findSymbolByName(const std::string & name, SymbolInfo & symInfo, bool caseSensitive) override;
 
 	public:
+		// Get lpBase and szFileSize from MODINFO in modules.cpp
 		bool initDwarf(PVOID lpBase, duint szFileSize); // initializes the dwarf library interface
-		DwarfModuleObject* getDwarfModule();
+		DwarfModuleObject* getDwarfModule(); // to retun this classes dwarf module object
 
 
 
