@@ -1546,5 +1546,8 @@
     <ClInclude Include="dwarf\libdwarf\pro_util.h">
       <Filter>Source Files\Third Party\libdwarf</Filter>
     </ClInclude>
+    <ClInclude Include="symbolundecorator.h">
+      <Filter>Header Files\Symbols</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
