@@ -87,7 +87,6 @@
     <ClCompile Include="dwarf\libdwarf\dwarf_line.c" />
     <ClCompile Include="dwarf\libdwarf\dwarf_line2.c" />
     <ClCompile Include="dwarf\libdwarf\dwarf_loc.c" />
-    <ClCompile Include="dwarf\libdwarf\dwarf_loc2.c" />
     <ClCompile Include="dwarf\libdwarf\dwarf_macro.c" />
     <ClCompile Include="dwarf\libdwarf\dwarf_macro5.c" />
     <ClCompile Include="dwarf\libdwarf\dwarf_names.c" />
@@ -404,9 +403,9 @@
     <ClInclude Include="memory.h" />
     <ClInclude Include="mnemonichelp.h" />
     <ClInclude Include="module.h" />
-    <ClInclude Include="msdia\cvConst.h" />
+    <ClInclude Include="msdia\cvconst.h" />
     <ClInclude Include="msdia\dia2.h" />
-    <ClInclude Include="msdia\diaCreate.h" />
+    <ClInclude Include="msdia\diacreate.h" />
     <ClInclude Include="msgqueue.h" />
     <ClInclude Include="murmurhash.h" />
     <ClInclude Include="patches.h" />
@@ -554,26 +553,26 @@
     <OutDir>$(ProjectDir)..\..\bin\x32\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <TargetName>x32dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)msdia;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x32d\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <TargetName>x32dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)msdia;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x64\</OutDir>
     <TargetName>x64dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)msdia;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(ProjectDir)..\..\bin\x64d\</OutDir>
     <TargetName>x64dbg</TargetName>
-    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\zydis_wrapper;$(ProjectDir)..\zydis_wrapper\zydis\include;$(ProjectDir);$(ProjectDir)analysis;$(ProjectDir)commands;$(ProjectDir)msdia;$(ProjectDir)dwarf;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>

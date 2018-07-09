@@ -35,12 +35,12 @@ extern "C" {
 	// dwarf object helper functions
 	// These have to be global because Dwarf lib expects these callbacks for
 	// Dwarf_Obj_Access_Methods
-	static int PfnGetSectionInfo(void* obj, Dwarf_Half section_index,
+	int PfnGetSectionInfo(void* obj, Dwarf_Half section_index,
 		Dwarf_Obj_Access_Section* return_section, int* err);
-	static Dwarf_Endianness PfnGetByteOrder(void* obj);
-	static Dwarf_Small PfnGetLenPointerSize(void* obj);
-	static Dwarf_Unsigned PfnGetSectionCount(void* obj);
-	static int PfnLoadSection(void* obj, Dwarf_Half section_index,
+	Dwarf_Endianness PfnGetByteOrder(void* obj);
+	Dwarf_Small PfnGetLenPointerSize(void* obj);
+	Dwarf_Unsigned PfnGetSectionCount(void* obj);
+	int PfnLoadSection(void* obj, Dwarf_Half section_index,
 		Dwarf_Small ** return_data, int *err);
 
 	//dwarf object methods structure
