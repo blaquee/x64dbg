@@ -7,12 +7,67 @@
 #include "debugger.h"
 #include "filehelper.h"
 #include "label.h"
-#include "yara/yara.h"
 #include "stringformat.h"
 #include "disasm_helper.h"
 #include "symbolinfo.h"
 
 static int maxFindResults = 5000;
+
+static bool handlePatternArgument(const char* pattern, std::vector<PatternByte> & searchpattern, String* patternshort = nullptr)
+{
+    searchpattern.clear();
+    auto handlePrefix = [&](const char* prefix, size_t size) -> bool
+    {
+        auto prefixLen = strlen(prefix);
+        if(_strnicmp(pattern, prefix, prefixLen) == 0)
+        {
+            duint value = 0;
+            if(!valfromstring(pattern + prefixLen, &value, false))
+                return true;
+            auto data = (unsigned char*)&value;
+            for(size_t i = 0; i < size; i++)
+            {
+                auto ch = data[i];
+                PatternByte b;
+                b.nibble[0].data = (ch >> 4) & 0xF;
+                b.nibble[0].wildcard = false;
+                b.nibble[1].data = ch & 0xF;
+                b.nibble[1].wildcard = false;
+                searchpattern.push_back(b);
+            }
+            return true;
+        }
+        return false;
+    };
+    auto result = (handlePrefix("byte:", 1)
+                   || handlePrefix("word:", 2)
+                   || handlePrefix("dword:", 4)
+#ifdef _WIN64
+                   || handlePrefix("qword:", 8)
+#endif //_WIN64
+                   || handlePrefix("ptr:", ArchValue(4, 8))
+                   //remove # from the start and end of the pattern (ODBGScript support)
+                   || patterntransform(StringUtils::Trim(stringformatinline(pattern), "#"), searchpattern)) && !searchpattern.empty();
+    if(result && patternshort)
+    {
+        const auto maxShortSize = 16;
+        for(size_t i = 0; i < min(searchpattern.size(), maxShortSize); i++)
+        {
+            auto doNibble = [&patternshort](const PatternByte::PatternNibble & n)
+            {
+                if(n.wildcard)
+                    *patternshort += "?";
+                else
+                    *patternshort += "0123456789ABCDEF"[n.data & 0xf];
+            };
+            doNibble(searchpattern[i].nibble[0]);
+            doNibble(searchpattern[i].nibble[1]);
+        }
+        if(searchpattern.size() > maxShortSize)
+            *patternshort += "...";
+    }
+    return result;
+}
 
 bool cbInstrFind(int argc, char* argv[])
 {
@@ -23,15 +78,12 @@ bool cbInstrFind(int argc, char* argv[])
     if(!valfromstring(argv[1], &addr, false))
         return false;
 
-    char pattern[deflen] = "";
-    //remove # from the start and end of the pattern (ODBGScript support)
-    if(argv[2][0] == '#')
-        strcpy_s(pattern, argv[2] + 1);
-    else
-        strcpy_s(pattern, argv[2]);
-    size_t len = strlen(pattern);
-    if(pattern[len - 1] == '#')
-        pattern[len - 1] = '\0';
+    std::vector<PatternByte> searchpattern;
+    if(!handlePatternArgument(argv[2], searchpattern))
+    {
+        dputs(QT_TRANSLATE_NOOP("DBG", "Failed to transform pattern!"));
+        return false;
+    }
 
     duint size = 0;
     duint base = MemFindBaseAddr(addr, &size, true);
@@ -58,7 +110,7 @@ bool cbInstrFind(int argc, char* argv[])
     else
         find_size = size - start;
 
-    duint foundoffset = patternfind(data() + start, find_size, pattern);
+    duint foundoffset = patternfind(data() + start, find_size, searchpattern);
     duint result = 0;
     if(foundoffset != -1)
         result = addr + foundoffset;
@@ -75,15 +127,13 @@ bool cbInstrFindAll(int argc, char* argv[])
     if(!valfromstring(argv[1], &addr, false))
         return false;
 
-    char pattern[deflen] = "";
-    //remove # from the start and end of the pattern (ODBGScript support)
-    if(argv[2][0] == '#')
-        strcpy_s(pattern, argv[2] + 1);
-    else
-        strcpy_s(pattern, argv[2]);
-    size_t len = strlen(pattern);
-    if(pattern[len - 1] == '#')
-        pattern[len - 1] = '\0';
+    std::vector<PatternByte> searchpattern;
+    String patternshort;
+    if(!handlePatternArgument(argv[2], searchpattern, &patternshort))
+    {
+        dputs(QT_TRANSLATE_NOOP("DBG", "Failed to transform pattern!"));
+        return false;
+    }
 
     duint size = 0;
     duint base = MemFindBaseAddr(addr, &size, true);
@@ -118,13 +168,8 @@ bool cbInstrFindAll(int argc, char* argv[])
         find_size = size - start;
 
     //setup reference view
-    char patternshort[256] = "";
-    strncpy_s(patternshort, pattern, min(16, len));
-    if(len > 16)
-        strcat_s(patternshort, "...");
-    char patterntitle[256] = "";
-    sprintf_s(patterntitle, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Pattern: %s")), patternshort);
-    GuiReferenceInitialize(patterntitle);
+    String patterntitle = StringUtils::sprintf(GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Pattern: %s")), patternshort.c_str());
+    GuiReferenceInitialize(patterntitle.c_str());
     GuiReferenceAddColumn(2 * sizeof(duint), GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Address")));
     if(findData)
         GuiReferenceAddColumn(0, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Data")));
@@ -136,12 +181,6 @@ bool cbInstrFindAll(int argc, char* argv[])
     int refCount = 0;
     duint i = 0;
     duint result = 0;
-    std::vector<PatternByte> searchpattern;
-    if(!patterntransform(pattern, searchpattern))
-    {
-        dputs(QT_TRANSLATE_NOOP("DBG", "Failed to transform pattern!"));
-        return false;
-    }
     while(refCount < maxFindResults)
     {
         duint foundoffset = patternfind(data() + start + i, find_size - i, searchpattern);
@@ -183,21 +222,14 @@ bool cbInstrFindAllMem(int argc, char* argv[])
 {
     if(IsArgumentsLessThan(argc, 3))
         return false;
+
     duint addr = 0;
     if(!valfromstring(argv[1], &addr, false))
         return false;
 
-    char pattern[deflen] = "";
-    //remove # from the start and end of the pattern (ODBGScript support)
-    if(argv[2][0] == '#')
-        strcpy_s(pattern, argv[2] + 1);
-    else
-        strcpy_s(pattern, argv[2]);
-    size_t len = strlen(pattern);
-    if(pattern[len - 1] == '#')
-        pattern[len - 1] = '\0';
     std::vector<PatternByte> searchpattern;
-    if(!patterntransform(pattern, searchpattern))
+    String patternshort;
+    if(!handlePatternArgument(argv[2], searchpattern, &patternshort))
     {
         dputs(QT_TRANSLATE_NOOP("DBG", "Failed to transform pattern!"));
         return false;
@@ -235,13 +267,8 @@ bool cbInstrFindAllMem(int argc, char* argv[])
     }
 
     //setup reference view
-    char patternshort[256] = "";
-    strncpy_s(patternshort, pattern, min(16, len));
-    if(len > 16)
-        strcat_s(patternshort, "...");
-    char patterntitle[256] = "";
-    sprintf_s(patterntitle, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Pattern: %s")), patternshort);
-    GuiReferenceInitialize(patterntitle);
+    String patterntitle = StringUtils::sprintf(GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Pattern: %s")), patternshort.c_str());
+    GuiReferenceInitialize(patterntitle.c_str());
     GuiReferenceAddColumn(2 * sizeof(duint), GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Address")));
     if(findData)
         GuiReferenceAddColumn(0, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Data")));
@@ -945,299 +972,6 @@ bool cbInstrGUIDFind(int argc, char* argv[])
     varset("$result", found, false);
     RegCloseKey(CLSID);
     return true;
-}
-
-static void yaraCompilerCallback(int error_level, const char* file_name, int line_number, const char* message, void* user_data)
-{
-    switch(error_level)
-    {
-    case YARA_ERROR_LEVEL_ERROR:
-        dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA ERROR] "));
-        break;
-    case YARA_ERROR_LEVEL_WARNING:
-        dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA WARNING] "));
-        break;
-    }
-    dprintf(QT_TRANSLATE_NOOP("DBG", "File: \"%s\", Line: %d, Message: \"%s\"\n"), file_name, line_number, message);
-}
-
-static String yara_print_string(const uint8_t* data, int length)
-{
-    String result = "\"";
-    const char* str = (const char*)data;
-    for(int i = 0; i < length; i++)
-    {
-        char cur[16] = "";
-        if(str[i] >= 32 && str[i] <= 126)
-            sprintf_s(cur, "%c", str[i]);
-        else
-            sprintf_s(cur, "\\x%02X", (uint8_t)str[i]);
-        result += cur;
-    }
-    result += "\"";
-    return result;
-}
-
-static String yara_print_hex_string(const uint8_t* data, int length)
-{
-    String result = "";
-    for(int i = 0; i < length; i++)
-    {
-        if(i)
-            result += " ";
-        char cur[16] = "";
-        sprintf_s(cur, "%02X", (uint8_t)data[i]);
-        result += cur;
-    }
-    return result;
-}
-
-struct YaraScanInfo
-{
-    duint base;
-    int index;
-    bool rawFile;
-    const char* modname;
-    bool debug;
-
-    YaraScanInfo(duint base, bool rawFile, const char* modname, bool debug)
-        : base(base), index(0), rawFile(rawFile), modname(modname), debug(debug)
-    {
-    }
-};
-
-static int yaraScanCallback(int message, void* message_data, void* user_data)
-{
-    YaraScanInfo* scanInfo = (YaraScanInfo*)user_data;
-    bool debug = scanInfo->debug;
-    switch(message)
-    {
-    case CALLBACK_MSG_RULE_MATCHING:
-    {
-        duint base = scanInfo->base;
-        YR_RULE* yrRule = (YR_RULE*)message_data;
-        auto addReference = [scanInfo, yrRule](duint addr, const char* identifier, const std::string & pattern)
-        {
-            auto index = scanInfo->index;
-            GuiReferenceSetRowCount(index + 1);
-            scanInfo->index++;
-
-            char addr_text[deflen] = "";
-            sprintf_s(addr_text, "%p", addr);
-            GuiReferenceSetCellContent(index, 0, addr_text); //Address
-            String ruleFullName = "";
-            ruleFullName += yrRule->identifier;
-            if(identifier)
-            {
-                ruleFullName += ".";
-                ruleFullName += identifier;
-            }
-            GuiReferenceSetCellContent(index, 1, ruleFullName.c_str()); //Rule
-            GuiReferenceSetCellContent(index, 2, pattern.c_str()); //Data
-        };
-
-        if(STRING_IS_NULL(yrRule->strings))
-        {
-            if(debug)
-                dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA] Global rule \"%s\" matched!\n"), yrRule->identifier);
-            addReference(base, nullptr, "");
-        }
-        else
-        {
-            if(debug)
-                dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA] Rule \"%s\" matched:\n"), yrRule->identifier);
-            YR_STRING* string;
-            yr_rule_strings_foreach(yrRule, string)
-            {
-                YR_MATCH* match;
-                yr_string_matches_foreach(string, match)
-                {
-                    String pattern;
-                    if(STRING_IS_HEX(string))
-                        pattern = yara_print_hex_string(match->data, match->match_length);
-                    else
-                        pattern = yara_print_string(match->data, match->match_length);
-                    auto offset = duint(match->base + match->offset);
-                    duint addr;
-                    if(scanInfo->rawFile) //convert raw offset to virtual offset
-                        addr = valfileoffsettova(scanInfo->modname, offset);
-                    else
-                        addr = base + offset;
-
-                    if(debug)
-                        dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA] String \"%s\" : %s on %p\n"), string->identifier, pattern.c_str(), addr);
-
-                    addReference(addr, string->identifier, pattern);
-                }
-            }
-        }
-    }
-    break;
-
-    case CALLBACK_MSG_RULE_NOT_MATCHING:
-    {
-        YR_RULE* yrRule = (YR_RULE*)message_data;
-        if(debug)
-            dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA] Rule \"%s\" did not match!\n"), yrRule->identifier);
-    }
-    break;
-
-    case CALLBACK_MSG_SCAN_FINISHED:
-    {
-        if(debug)
-            dputs(QT_TRANSLATE_NOOP("DBG", "[YARA] Scan finished!"));
-    }
-    break;
-
-    case CALLBACK_MSG_IMPORT_MODULE:
-    {
-        YR_MODULE_IMPORT* yrModuleImport = (YR_MODULE_IMPORT*)message_data;
-        if(debug)
-            dprintf(QT_TRANSLATE_NOOP("DBG", "[YARA] Imported module \"%s\"!\n"), yrModuleImport->module_name);
-    }
-    break;
-    }
-    return ERROR_SUCCESS; //nicely undocumented what this should be
-}
-
-bool cbInstrYara(int argc, char* argv[])
-{
-    if(IsArgumentsLessThan(argc, 2))
-        return false;
-    duint addr = 0;
-    SELECTIONDATA sel;
-    GuiSelectionGet(GUI_DISASSEMBLY, &sel);
-    addr = sel.start;
-
-    duint base = 0;
-    duint size = 0;
-    duint mod = ModBaseFromName(argv[2]);
-    bool rawFile = false;
-    if(mod)
-    {
-        base = mod;
-        size = ModSizeFromAddr(base);
-        rawFile = argc > 3 && *argv[3] == '1';
-    }
-    else
-    {
-        if(!valfromstring(argv[2], &addr))
-        {
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Invalid value \"%s\"!\n"), argv[2]);
-            return false;
-        }
-
-        size = 0;
-        if(argc >= 4)
-            if(!valfromstring(argv[3], &size))
-                size = 0;
-        if(!size)
-            addr = MemFindBaseAddr(addr, &size);
-        base = addr;
-    }
-    std::vector<unsigned char> rawFileData;
-    if(rawFile) //read the file from disk
-    {
-        char modPath[MAX_PATH] = "";
-        if(!ModPathFromAddr(base, modPath, MAX_PATH))
-        {
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Failed to get module path for %p!\n"), base);
-            return false;
-        }
-        if(!FileHelper::ReadAllData(modPath, rawFileData))
-        {
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Failed to read file \"%s\"!\n"), modPath);
-            return false;
-        }
-        size = rawFileData.size();
-    }
-    Memory<uint8_t*> data(size);
-    if(rawFile)
-        memcpy(data(), rawFileData.data(), size);
-    else
-    {
-        memset(data(), 0xCC, data.size());
-        MemReadDumb(base, data(), size);
-    }
-
-    String rulesContent;
-    if(!FileHelper::ReadAllText(argv[1], rulesContent))
-    {
-        dprintf(QT_TRANSLATE_NOOP("DBG", "Failed to read the rules file \"%s\"\n"), argv[1]);
-        return false;
-    }
-
-    bool bSuccess = false;
-    YR_COMPILER* yrCompiler;
-    if(yr_compiler_create(&yrCompiler) == ERROR_SUCCESS)
-    {
-        yr_compiler_set_callback(yrCompiler, yaraCompilerCallback, 0);
-        if(yr_compiler_add_string(yrCompiler, rulesContent.c_str(), nullptr) == 0) //no errors found
-        {
-            YR_RULES* yrRules;
-            if(yr_compiler_get_rules(yrCompiler, &yrRules) == ERROR_SUCCESS)
-            {
-                //initialize new reference tab
-                char modname[MAX_MODULE_SIZE] = "";
-                if(!ModNameFromAddr(base, modname, true))
-                    sprintf_s(modname, "%p", base);
-                String fullName;
-                const char* fileName = strrchr(argv[1], '\\');
-                if(fileName)
-                    fullName = fileName + 1;
-                else
-                    fullName = argv[1];
-                fullName += " (";
-                fullName += modname;
-                fullName += ")"; //nanana, very ugly code (long live open source)
-                GuiReferenceInitialize(fullName.c_str());
-                GuiReferenceAddColumn(sizeof(duint) * 2, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Address")));
-                GuiReferenceAddColumn(48, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Rule")));
-                GuiReferenceAddColumn(10, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "Data")));
-                GuiReferenceSetRowCount(0);
-                GuiReferenceReloadData();
-                YaraScanInfo scanInfo(base, rawFile, argv[2], settingboolget("Engine", "YaraDebug"));
-                duint ticks = GetTickCount();
-                dputs(QT_TRANSLATE_NOOP("DBG", "[YARA] Scan started..."));
-                int err = yr_rules_scan_mem(yrRules, data(), size, 0, yaraScanCallback, &scanInfo, 0);
-                GuiReferenceReloadData();
-                switch(err)
-                {
-                case ERROR_SUCCESS:
-                    dprintf(QT_TRANSLATE_NOOP("DBG", "%u scan results in %ums...\n"), DWORD(scanInfo.index), GetTickCount() - DWORD(ticks));
-                    bSuccess = true;
-                    break;
-                case ERROR_TOO_MANY_MATCHES:
-                    dputs(QT_TRANSLATE_NOOP("DBG", "Too many matches!"));
-                    break;
-                default:
-                    dputs(QT_TRANSLATE_NOOP("DBG", "Error while scanning memory!"));
-                    break;
-                }
-                yr_rules_destroy(yrRules);
-            }
-            else
-                dputs(QT_TRANSLATE_NOOP("DBG", "Error while getting the rules!"));
-        }
-        else
-            dputs(QT_TRANSLATE_NOOP("DBG", "Errors in the rules file!"));
-        yr_compiler_destroy(yrCompiler);
-    }
-    else
-        dputs(QT_TRANSLATE_NOOP("DBG", "yr_compiler_create failed!"));
-    return bSuccess;
-}
-
-bool cbInstrYaramod(int argc, char* argv[])
-{
-    if(IsArgumentsLessThan(argc, 3))
-        return false;
-    if(!ModBaseFromName(argv[2]))
-    {
-        dprintf(QT_TRANSLATE_NOOP("DBG", "Invalid module \"%s\"!\n"), argv[2]);
-        return false;
-    }
-    return cmddirectexec(StringUtils::sprintf("yara \"%s\",\"%s\",%s", argv[1], argv[2], argc > 3 && *argv[3] == '1' ? "1" : "0").c_str());
 }
 
 bool cbInstrSetMaxFindResult(int argc, char* argv[])

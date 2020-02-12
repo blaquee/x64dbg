@@ -32,7 +32,8 @@ private:
     void setupRightClickContextMenu();
     void makeVisible(duint index);
     QString getAddrText(dsint cur_addr, char label[MAX_LABEL_SIZE], bool getLabel);
-    QString getIndexText(duint index);
+    QString getIndexText(duint index) const;
+    RichTextPainter::List getRichBytes(const Instruction_t & instr) const;
     void pushSelectionInto(bool copyBytes, QTextStream & stream, QTextStream* htmlStream = nullptr);
     void copySelectionSlot(bool copyBytes);
     void copySelectionToFileSlot(bool copyBytes);
@@ -56,9 +57,10 @@ private:
     };
 
     SelectionData mSelection;
-    CapstoneTokenizer::SingleToken mHighlightToken;
+    ZydisTokenizer::SingleToken mHighlightToken;
     bool mHighlightingMode;
     bool mPermanentHighlightingMode;
+    bool mAutoDisassemblyFollowSelection;
 
     TraceFileReader* mTraceFile;
     QBeaEngine* mDisasm;
@@ -97,6 +99,7 @@ private:
     QColor mAutoCommentBackgroundColor;
     QColor mCommentColor;
     QColor mCommentBackgroundColor;
+    QColor mDisassemblyRelocationUnderlineColor;
 
 signals:
     void displayReferencesWidget();
@@ -106,6 +109,7 @@ public slots:
     void openSlot(const QString & fileName);
     void toggleRunTraceSlot();
     void closeFileSlot();
+    void closeDeleteSlot();
     void parseFinishedSlot();
     void tokenizerConfigUpdatedSlot();
 
@@ -130,6 +134,8 @@ public slots:
     void searchMemRefSlot();
 
     void updateSlot(); //debug
+
+    void toggleAutoDisassemblyFollowSelectionSlot();
 };
 
 #endif //TRACEBROWSER_H

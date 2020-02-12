@@ -468,6 +468,14 @@ static bool isSafe64NopRegOp(const ZydisDecodedOperand & op)
     case ZYDIS_REGISTER_ESP:
     case ZYDIS_REGISTER_ESI:
     case ZYDIS_REGISTER_EDI:
+    case ZYDIS_REGISTER_R8D:
+    case ZYDIS_REGISTER_R9D:
+    case ZYDIS_REGISTER_R10D:
+    case ZYDIS_REGISTER_R11D:
+    case ZYDIS_REGISTER_R12D:
+    case ZYDIS_REGISTER_R13D:
+    case ZYDIS_REGISTER_R14D:
+    case ZYDIS_REGISTER_R15D:
         return false; //32 bit register modifications clear the high part of the 64 bit register
     default:
         return true; //all other registers are safe
@@ -865,10 +873,22 @@ void Zydis::RegInfo(uint8_t regs[ZYDIS_REGISTER_MAX_VALUE + 1]) const
         {
         case ZYDIS_OPERAND_TYPE_REGISTER:
         {
-            if(op.action & ZYDIS_OPERAND_ACTION_MASK_READ)
+            switch(op.action)
+            {
+            case ZYDIS_OPERAND_ACTION_READ:
+            case ZYDIS_OPERAND_ACTION_CONDREAD:
                 regs[op.reg.value] |= RAIRead;
-            if(op.action & ZYDIS_OPERAND_ACTION_MASK_WRITE)
+                break;
+            case ZYDIS_OPERAND_ACTION_WRITE:
+            case ZYDIS_OPERAND_ACTION_CONDWRITE:
                 regs[op.reg.value] |= RAIWrite;
+                break;
+            case ZYDIS_OPERAND_ACTION_READWRITE:
+            case ZYDIS_OPERAND_ACTION_READ_CONDWRITE:
+            case ZYDIS_OPERAND_ACTION_CONDREAD_WRITE:
+                regs[op.reg.value] |= RAIRead | RAIWrite;
+                break;
+            }
             regs[op.reg.value] |= op.visibility == ZYDIS_OPERAND_VISIBILITY_HIDDEN ?
                                   RAIImplicit : RAIExplicit;
         }

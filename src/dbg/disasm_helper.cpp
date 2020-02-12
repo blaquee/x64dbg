@@ -111,7 +111,7 @@ duint disasmnext(unsigned char* data, duint base, duint size, duint ip, int n)
     return ip;
 }
 
-static void HandleCapstoneOperand(Zydis & cp, int opindex, DISASM_ARG* arg, bool getregs)
+static void HandleZydisOperand(Zydis & cp, int opindex, DISASM_ARG* arg, bool getregs)
 {
     auto value = cp.ResolveOpValue(opindex, [&cp, getregs](ZydisRegister reg)
     {
@@ -182,6 +182,11 @@ static void HandleCapstoneOperand(Zydis & cp, int opindex, DISASM_ARG* arg, bool
     }
     break;
 
+    case ZYDIS_OPERAND_TYPE_POINTER:
+        arg->type = arg_normal;
+        arg->value = op.ptr.offset;
+        break;
+
     default:
         break;
     }
@@ -202,7 +207,7 @@ void disasmget(Zydis & cp, unsigned char* buffer, duint addr, DISASM_INSTR* inst
         return;
     }
     auto cpInstr = cp.GetInstr();
-    strcpy_s(instr->instruction, cp.InstructionText().c_str());
+    strncpy_s(instr->instruction, cp.InstructionText().c_str(), _TRUNCATE);
     instr->instr_size = cpInstr->length;
     if(cp.IsBranchType(Zydis::BTJmp | Zydis::BTLoop | Zydis::BTRet | Zydis::BTCall))
         instr->type = instr_branch;
@@ -212,7 +217,7 @@ void disasmget(Zydis & cp, unsigned char* buffer, duint addr, DISASM_INSTR* inst
         instr->type = instr_normal;
     instr->argcount = cp.OpCount() <= 3 ? cp.OpCount() : 3;
     for(int i = 0; i < instr->argcount; i++)
-        HandleCapstoneOperand(cp, i, &instr->arg[i], getregs);
+        HandleZydisOperand(cp, i, &instr->arg[i], getregs);
 }
 
 void disasmget(Zydis & cp, duint addr, DISASM_INSTR* instr, bool getregs)

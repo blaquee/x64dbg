@@ -1,4 +1,3 @@
-#include <QClipboard>
 #include <QMessageBox>
 #include <QListWidget>
 #include <QToolTip>
@@ -31,6 +30,7 @@ void RegistersView::InitMappings()
     // create mapping from internal id to name
     mRegisterMapping.clear();
     mRegisterPlaces.clear();
+    mRegisterRelativePlaces.clear();
     int offset = 0;
 
     /* Register_Position is a struct definition the position
@@ -40,148 +40,250 @@ void RegistersView::InitMappings()
 #ifdef _WIN64
     mRegisterMapping.insert(CAX, "RAX");
     mRegisterPlaces.insert(CAX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CAX, Register_Relative_Position(UNKNOWN, CBX));
     mRegisterMapping.insert(CBX, "RBX");
     mRegisterPlaces.insert(CBX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CBX, Register_Relative_Position(CAX, CCX));
     mRegisterMapping.insert(CCX, "RCX");
     mRegisterPlaces.insert(CCX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CCX, Register_Relative_Position(CBX, CDX));
     mRegisterMapping.insert(CDX, "RDX");
     mRegisterPlaces.insert(CDX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CDX, Register_Relative_Position(CCX, CBP));
     mRegisterMapping.insert(CBP, "RBP");
     mRegisterPlaces.insert(CBP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CBP, Register_Relative_Position(CDX, CSP));
     mRegisterMapping.insert(CSP, "RSP");
     mRegisterPlaces.insert(CSP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CSP, Register_Relative_Position(CBP, CSI));
     mRegisterMapping.insert(CSI, "RSI");
     mRegisterPlaces.insert(CSI, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CSI, Register_Relative_Position(CSP, CDI));
     mRegisterMapping.insert(CDI, "RDI");
     mRegisterPlaces.insert(CDI, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CDI, Register_Relative_Position(CSI, R8));
 
     offset++;
 
     mRegisterMapping.insert(R8, "R8");
     mRegisterPlaces.insert(R8, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R8, Register_Relative_Position(CDI, R9));
     mRegisterMapping.insert(R9, "R9");
     mRegisterPlaces.insert(R9, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R9, Register_Relative_Position(R8, R10));
     mRegisterMapping.insert(R10, "R10");
     mRegisterPlaces.insert(R10, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R10, Register_Relative_Position(R9, R11));
     mRegisterMapping.insert(R11, "R11");
     mRegisterPlaces.insert(R11, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R11, Register_Relative_Position(R10, R12));
     mRegisterMapping.insert(R12, "R12");
     mRegisterPlaces.insert(R12, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R12, Register_Relative_Position(R11, R13));
     mRegisterMapping.insert(R13, "R13");
     mRegisterPlaces.insert(R13, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R13, Register_Relative_Position(R12, R14));
     mRegisterMapping.insert(R14, "R14");
     mRegisterPlaces.insert(R14, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R14, Register_Relative_Position(R13, R15));
     mRegisterMapping.insert(R15, "R15");
     mRegisterPlaces.insert(R15, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(R15, Register_Relative_Position(R14, CIP));
 
     offset++;
 
     mRegisterMapping.insert(CIP, "RIP");
     mRegisterPlaces.insert(CIP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CIP, Register_Relative_Position(R15, EFLAGS));
 
     offset++;
 
     mRegisterMapping.insert(EFLAGS, "RFLAGS");
     mRegisterPlaces.insert(EFLAGS, Register_Position(offset++, 0, 9, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(EFLAGS, Register_Relative_Position(CIP, ZF));
 #else //x32
     mRegisterMapping.insert(CAX, "EAX");
     mRegisterPlaces.insert(CAX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CAX, Register_Relative_Position(UNKNOWN, CBX));
     mRegisterMapping.insert(CBX, "EBX");
     mRegisterPlaces.insert(CBX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CBX, Register_Relative_Position(CAX, CCX));
     mRegisterMapping.insert(CCX, "ECX");
     mRegisterPlaces.insert(CCX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CCX, Register_Relative_Position(CBX, CDX));
     mRegisterMapping.insert(CDX, "EDX");
     mRegisterPlaces.insert(CDX, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CDX, Register_Relative_Position(CCX, CBP));
     mRegisterMapping.insert(CBP, "EBP");
     mRegisterPlaces.insert(CBP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CBP, Register_Relative_Position(CDX, CSP));
     mRegisterMapping.insert(CSP, "ESP");
     mRegisterPlaces.insert(CSP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CSP, Register_Relative_Position(CBP, CSI));
     mRegisterMapping.insert(CSI, "ESI");
     mRegisterPlaces.insert(CSI, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CSI, Register_Relative_Position(CSP, CDI));
     mRegisterMapping.insert(CDI, "EDI");
     mRegisterPlaces.insert(CDI, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CDI, Register_Relative_Position(CSI, CIP));
 
     offset++;
 
     mRegisterMapping.insert(CIP, "EIP");
     mRegisterPlaces.insert(CIP, Register_Position(offset++, 0, 6, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(CIP, Register_Relative_Position(CDI, EFLAGS));
 
     offset++;
 
     mRegisterMapping.insert(EFLAGS, "EFLAGS");
     mRegisterPlaces.insert(EFLAGS, Register_Position(offset++, 0, 9, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(EFLAGS, Register_Relative_Position(CIP, ZF));
 #endif
 
     mRegisterMapping.insert(ZF, "ZF");
     mRegisterPlaces.insert(ZF, Register_Position(offset, 0, 3, 1));
+    mRegisterRelativePlaces.insert(ZF, Register_Relative_Position(EFLAGS, PF, EFLAGS, OF));
     mRegisterMapping.insert(PF, "PF");
     mRegisterPlaces.insert(PF, Register_Position(offset, 6, 3, 1));
+    mRegisterRelativePlaces.insert(PF, Register_Relative_Position(ZF, AF, EFLAGS, SF));
     mRegisterMapping.insert(AF, "AF");
     mRegisterPlaces.insert(AF, Register_Position(offset++, 12, 3, 1));
+    mRegisterRelativePlaces.insert(AF, Register_Relative_Position(PF, OF, EFLAGS, DF));
 
     mRegisterMapping.insert(OF, "OF");
     mRegisterPlaces.insert(OF, Register_Position(offset, 0, 3, 1));
+    mRegisterRelativePlaces.insert(OF, Register_Relative_Position(AF, SF, ZF, CF));
     mRegisterMapping.insert(SF, "SF");
     mRegisterPlaces.insert(SF, Register_Position(offset, 6, 3, 1));
+    mRegisterRelativePlaces.insert(SF, Register_Relative_Position(OF, DF, PF, TF));
     mRegisterMapping.insert(DF, "DF");
     mRegisterPlaces.insert(DF, Register_Position(offset++, 12, 3, 1));
+    mRegisterRelativePlaces.insert(DF, Register_Relative_Position(SF, CF, AF, IF));
 
     mRegisterMapping.insert(CF, "CF");
     mRegisterPlaces.insert(CF, Register_Position(offset, 0, 3, 1));
+    mRegisterRelativePlaces.insert(CF, Register_Relative_Position(DF, TF, OF, LastError));
     mRegisterMapping.insert(TF, "TF");
     mRegisterPlaces.insert(TF, Register_Position(offset, 6, 3, 1));
+    mRegisterRelativePlaces.insert(TF, Register_Relative_Position(CF, IF, SF, LastError));
     mRegisterMapping.insert(IF, "IF");
     mRegisterPlaces.insert(IF, Register_Position(offset++, 12, 3, 1));
+    mRegisterRelativePlaces.insert(IF, Register_Relative_Position(TF, LastError, DF, LastError));
 
     offset++;
 
     mRegisterMapping.insert(LastError, "LastError");
     mRegisterPlaces.insert(LastError, Register_Position(offset++, 0, 11, 20));
+    mRegisterRelativePlaces.insert(LastError, Register_Relative_Position(IF, LastStatus));
     mMODIFYDISPLAY.insert(LastError);
     mRegisterMapping.insert(LastStatus, "LastStatus");
     mRegisterPlaces.insert(LastStatus, Register_Position(offset++, 0, 11, 20));
+    mRegisterRelativePlaces.insert(LastStatus, Register_Relative_Position(LastError, GS));
     mMODIFYDISPLAY.insert(LastStatus);
 
     offset++;
 
     mRegisterMapping.insert(GS, "GS");
     mRegisterPlaces.insert(GS, Register_Position(offset, 0, 3, 4));
+    mRegisterRelativePlaces.insert(GS, Register_Relative_Position(LastStatus, FS, LastStatus, ES));
     mRegisterMapping.insert(FS, "FS");
     mRegisterPlaces.insert(FS, Register_Position(offset++, 9, 3, 4));
+    mRegisterRelativePlaces.insert(FS, Register_Relative_Position(GS, ES, LastStatus, DS));
     mRegisterMapping.insert(ES, "ES");
     mRegisterPlaces.insert(ES, Register_Position(offset, 0, 3, 4));
+    mRegisterRelativePlaces.insert(ES, Register_Relative_Position(FS, DS, GS, CS));
     mRegisterMapping.insert(DS, "DS");
     mRegisterPlaces.insert(DS, Register_Position(offset++, 9, 3, 4));
+    mRegisterRelativePlaces.insert(DS, Register_Relative_Position(ES, CS, FS, SS));
     mRegisterMapping.insert(CS, "CS");
     mRegisterPlaces.insert(CS, Register_Position(offset, 0, 3, 4));
     mRegisterMapping.insert(SS, "SS");
     mRegisterPlaces.insert(SS, Register_Position(offset++, 9, 3, 4));
 
+
     if(mShowFpu)
     {
+
         offset++;
 
-        mRegisterMapping.insert(x87r0, "x87r0");
-        mRegisterPlaces.insert(x87r0, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r1, "x87r1");
-        mRegisterPlaces.insert(x87r1, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r2, "x87r2");
-        mRegisterPlaces.insert(x87r2, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r3, "x87r3");
-        mRegisterPlaces.insert(x87r3, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r4, "x87r4");
-        mRegisterPlaces.insert(x87r4, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r5, "x87r5");
-        mRegisterPlaces.insert(x87r5, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r6, "x87r6");
-        mRegisterPlaces.insert(x87r6, Register_Position(offset++, 0, 6, 10 * 2));
-        mRegisterMapping.insert(x87r7, "x87r7");
-        mRegisterPlaces.insert(x87r7, Register_Position(offset++, 0, 6, 10 * 2));
+        if(mFpuMode)
+        {
+            mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, x87r0));
+            mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, x87r0, DS, x87r0));
+
+            mRegisterMapping.insert(x87r0, "x87r0");
+            mRegisterPlaces.insert(x87r0, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r0, Register_Relative_Position(SS, x87r1));
+            mRegisterMapping.insert(x87r1, "x87r1");
+            mRegisterPlaces.insert(x87r1, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r1, Register_Relative_Position(x87r0, x87r2));
+            mRegisterMapping.insert(x87r2, "x87r2");
+            mRegisterPlaces.insert(x87r2, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r2, Register_Relative_Position(x87r1, x87r3));
+            mRegisterMapping.insert(x87r3, "x87r3");
+            mRegisterPlaces.insert(x87r3, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r3, Register_Relative_Position(x87r2, x87r4));
+            mRegisterMapping.insert(x87r4, "x87r4");
+            mRegisterPlaces.insert(x87r4, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r4, Register_Relative_Position(x87r3, x87r5));
+            mRegisterMapping.insert(x87r5, "x87r5");
+            mRegisterPlaces.insert(x87r5, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r5, Register_Relative_Position(x87r4, x87r6));
+            mRegisterMapping.insert(x87r6, "x87r6");
+            mRegisterPlaces.insert(x87r6, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r6, Register_Relative_Position(x87r5, x87r7));
+            mRegisterMapping.insert(x87r7, "x87r7");
+            mRegisterPlaces.insert(x87r7, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87r7, Register_Relative_Position(x87r6, x87TagWord));
+
+        }
+        else
+        {
+            mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, x87st0));
+            mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, x87st0, DS, x87st0));
+
+            mRegisterMapping.insert(x87st0, "ST(0)");
+            mRegisterPlaces.insert(x87st0, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st0, Register_Relative_Position(SS, x87st1));
+            mRegisterMapping.insert(x87st1, "ST(1)");
+            mRegisterPlaces.insert(x87st1, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st1, Register_Relative_Position(x87st0, x87st2));
+            mRegisterMapping.insert(x87st2, "ST(2)");
+            mRegisterPlaces.insert(x87st2, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st2, Register_Relative_Position(x87st1, x87st3));
+            mRegisterMapping.insert(x87st3, "ST(3)");
+            mRegisterPlaces.insert(x87st3, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st3, Register_Relative_Position(x87st2, x87st4));
+            mRegisterMapping.insert(x87st4, "ST(4)");
+            mRegisterPlaces.insert(x87st4, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st4, Register_Relative_Position(x87st3, x87st5));
+            mRegisterMapping.insert(x87st5, "ST(5)");
+            mRegisterPlaces.insert(x87st5, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st5, Register_Relative_Position(x87st4, x87st6));
+            mRegisterMapping.insert(x87st6, "ST(6)");
+            mRegisterPlaces.insert(x87st6, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st6, Register_Relative_Position(x87st5, x87st7));
+            mRegisterMapping.insert(x87st7, "ST(7)");
+            mRegisterPlaces.insert(x87st7, Register_Position(offset++, 0, 6, 10 * 2));
+            mRegisterRelativePlaces.insert(x87st7, Register_Relative_Position(x87st6, x87TagWord));
+
+        }
 
         offset++;
 
         mRegisterMapping.insert(x87TagWord, "x87TagWord");
         mRegisterPlaces.insert(x87TagWord, Register_Position(offset++, 0, 11, sizeof(WORD) * 2));
+
+        if(mFpuMode)
+        {
+            mRegisterRelativePlaces.insert(x87TagWord, Register_Relative_Position(x87r7, x87TW_0));
+        }
+        else
+        {
+            mRegisterRelativePlaces.insert(x87TagWord, Register_Relative_Position(x87st7, x87TW_0));
+        }
+
+
         //Special treatment of long internationalized string
         int NextColumnPosition = 20;
         int temp;
@@ -197,236 +299,365 @@ void RegistersView::InitMappings()
         NextColumnPosition = std::max(NextColumnPosition, temp);
         mRegisterMapping.insert(x87TW_0, "x87TW_0");
         mRegisterPlaces.insert(x87TW_0, Register_Position(offset, 0, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_0, Register_Relative_Position(x87TagWord, x87TW_1, x87TagWord, x87TW_2));
         mRegisterMapping.insert(x87TW_1, "x87TW_1");
         mRegisterPlaces.insert(x87TW_1, Register_Position(offset++, NextColumnPosition, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_1, Register_Relative_Position(x87TW_0, x87TW_2, x87TagWord, x87TW_3));
 
         mRegisterMapping.insert(x87TW_2, "x87TW_2");
         mRegisterPlaces.insert(x87TW_2, Register_Position(offset, 0, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_2, Register_Relative_Position(x87TW_1, x87TW_3, x87TW_0, x87TW_4));
         mRegisterMapping.insert(x87TW_3, "x87TW_3");
         mRegisterPlaces.insert(x87TW_3, Register_Position(offset++, NextColumnPosition, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_3, Register_Relative_Position(x87TW_2, x87TW_4, x87TW_1, x87TW_5));
 
         mRegisterMapping.insert(x87TW_4, "x87TW_4");
         mRegisterPlaces.insert(x87TW_4, Register_Position(offset, 0, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_4, Register_Relative_Position(x87TW_3, x87TW_5, x87TW_2, x87TW_6));
         mRegisterMapping.insert(x87TW_5, "x87TW_5");
         mRegisterPlaces.insert(x87TW_5, Register_Position(offset++, NextColumnPosition, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_5, Register_Relative_Position(x87TW_4, x87TW_6, x87TW_3, x87TW_7));
 
         mRegisterMapping.insert(x87TW_6, "x87TW_6");
         mRegisterPlaces.insert(x87TW_6, Register_Position(offset, 0, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_6, Register_Relative_Position(x87TW_5, x87TW_7, x87TW_4, x87StatusWord));
         mRegisterMapping.insert(x87TW_7, "x87TW_7");
         mRegisterPlaces.insert(x87TW_7, Register_Position(offset++, NextColumnPosition, 8, 10));
+        mRegisterRelativePlaces.insert(x87TW_7, Register_Relative_Position(x87TW_6, x87StatusWord, x87TW_5, x87StatusWord));
+
 
         offset++;
 
         mRegisterMapping.insert(x87StatusWord, "x87StatusWord");
         mRegisterPlaces.insert(x87StatusWord, Register_Position(offset++, 0, 14, sizeof(WORD) * 2));
+        mRegisterRelativePlaces.insert(x87StatusWord, Register_Relative_Position(x87TW_7, x87SW_B));
 
         mRegisterMapping.insert(x87SW_B, "x87SW_B");
         mRegisterPlaces.insert(x87SW_B, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87SW_B, Register_Relative_Position(x87StatusWord, x87SW_C3, x87StatusWord, x87SW_C1));
         mRegisterMapping.insert(x87SW_C3, "x87SW_C3");
         mRegisterPlaces.insert(x87SW_C3, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_C3, Register_Relative_Position(x87SW_B, x87SW_C2, x87StatusWord, x87SW_C0));
         mRegisterMapping.insert(x87SW_C2, "x87SW_C2");
         mRegisterPlaces.insert(x87SW_C2, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_C2, Register_Relative_Position(x87SW_C3, x87SW_C1, x87StatusWord, x87SW_ES));
 
         mRegisterMapping.insert(x87SW_C1, "x87SW_C1");
         mRegisterPlaces.insert(x87SW_C1, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87SW_C1, Register_Relative_Position(x87SW_C2, x87SW_C0, x87SW_B, x87SW_SF));
         mRegisterMapping.insert(x87SW_C0, "x87SW_C0");
         mRegisterPlaces.insert(x87SW_C0, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_C0, Register_Relative_Position(x87SW_C1, x87SW_ES, x87SW_C3, x87SW_P));
         mRegisterMapping.insert(x87SW_ES, "x87SW_ES");
         mRegisterPlaces.insert(x87SW_ES, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_ES, Register_Relative_Position(x87SW_C0, x87SW_SF, x87SW_C2, x87SW_U));
 
         mRegisterMapping.insert(x87SW_SF, "x87SW_SF");
         mRegisterPlaces.insert(x87SW_SF, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87SW_SF, Register_Relative_Position(x87SW_ES, x87SW_P, x87SW_C1, x87SW_O));
         mRegisterMapping.insert(x87SW_P, "x87SW_P");
         mRegisterPlaces.insert(x87SW_P, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_P, Register_Relative_Position(x87SW_SF, x87SW_U, x87SW_C0, x87SW_Z));
         mRegisterMapping.insert(x87SW_U, "x87SW_U");
         mRegisterPlaces.insert(x87SW_U, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_U, Register_Relative_Position(x87SW_P, x87SW_O, x87SW_ES, x87SW_D));
 
         mRegisterMapping.insert(x87SW_O, "x87SW_O");
         mRegisterPlaces.insert(x87SW_O, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87SW_O, Register_Relative_Position(x87SW_U, x87SW_Z, x87SW_SF, x87SW_I));
         mRegisterMapping.insert(x87SW_Z, "x87SW_Z");
         mRegisterPlaces.insert(x87SW_Z, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_Z, Register_Relative_Position(x87SW_O, x87SW_D, x87SW_P, x87SW_TOP));
         mRegisterMapping.insert(x87SW_D, "x87SW_D");
         mRegisterPlaces.insert(x87SW_D, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(x87SW_D, Register_Relative_Position(x87SW_Z, x87SW_I, x87SW_U, x87SW_TOP));
 
         mRegisterMapping.insert(x87SW_I, "x87SW_I");
         mRegisterPlaces.insert(x87SW_I, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87SW_I, Register_Relative_Position(x87SW_D, x87SW_TOP, x87SW_O, x87ControlWord));
         mRegisterMapping.insert(x87SW_TOP, "x87SW_TOP");
         mRegisterPlaces.insert(x87SW_TOP, Register_Position(offset++, 12, 10, 13));
+        mRegisterRelativePlaces.insert(x87SW_TOP, Register_Relative_Position(x87SW_I, x87ControlWord, x87SW_Z, x87ControlWord));
 
         offset++;
 
         mRegisterMapping.insert(x87ControlWord, "x87ControlWord");
         mRegisterPlaces.insert(x87ControlWord, Register_Position(offset++, 0, 15, sizeof(WORD) * 2));
+        mRegisterRelativePlaces.insert(x87ControlWord, Register_Relative_Position(x87SW_TOP, x87CW_IC));
 
         mRegisterMapping.insert(x87CW_IC, "x87CW_IC");
         mRegisterPlaces.insert(x87CW_IC, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87CW_IC, Register_Relative_Position(x87ControlWord, x87CW_ZM, x87ControlWord, x87CW_UM));
         mRegisterMapping.insert(x87CW_ZM, "x87CW_ZM");
         mRegisterPlaces.insert(x87CW_ZM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87CW_ZM, Register_Relative_Position(x87CW_IC, x87CW_PM, x87ControlWord, x87CW_OM));
         mRegisterMapping.insert(x87CW_PM, "x87CW_PM");
         mRegisterPlaces.insert(x87CW_PM, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(x87CW_PM, Register_Relative_Position(x87CW_ZM, x87CW_UM, x87ControlWord, x87CW_PC));
 
         mRegisterMapping.insert(x87CW_UM, "x87CW_UM");
         mRegisterPlaces.insert(x87CW_UM, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87CW_UM, Register_Relative_Position(x87CW_PM, x87CW_OM, x87CW_IC, x87CW_DM));
         mRegisterMapping.insert(x87CW_OM, "x87CW_OM");
         mRegisterPlaces.insert(x87CW_OM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87CW_OM, Register_Relative_Position(x87CW_UM, x87CW_PC, x87CW_ZM, x87CW_IM));
         mRegisterMapping.insert(x87CW_PC, "x87CW_PC");
         mRegisterPlaces.insert(x87CW_PC, Register_Position(offset++, 25, 10, 14));
+        mRegisterRelativePlaces.insert(x87CW_PC, Register_Relative_Position(x87CW_OM, x87CW_DM, x87CW_PM, x87CW_RC));
 
         mRegisterMapping.insert(x87CW_DM, "x87CW_DM");
         mRegisterPlaces.insert(x87CW_DM, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(x87CW_DM, Register_Relative_Position(x87CW_PC, x87CW_IM, x87CW_UM, MxCsr));
         mRegisterMapping.insert(x87CW_IM, "x87CW_IM");
         mRegisterPlaces.insert(x87CW_IM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(x87CW_IM, Register_Relative_Position(x87CW_DM, x87CW_RC, x87CW_OM, MxCsr));
         mRegisterMapping.insert(x87CW_RC, "x87CW_RC");
         mRegisterPlaces.insert(x87CW_RC, Register_Position(offset++, 25, 10, 14));
+        mRegisterRelativePlaces.insert(x87CW_RC, Register_Relative_Position(x87CW_IM, MxCsr, x87CW_PC, MxCsr));
 
         offset++;
 
         mRegisterMapping.insert(MxCsr, "MxCsr");
         mRegisterPlaces.insert(MxCsr, Register_Position(offset++, 0, 6, sizeof(DWORD) * 2));
+        mRegisterRelativePlaces.insert(MxCsr, Register_Relative_Position(x87CW_RC, MxCsr_FZ));
 
         mRegisterMapping.insert(MxCsr_FZ, "MxCsr_FZ");
         mRegisterPlaces.insert(MxCsr_FZ, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(MxCsr_FZ, Register_Relative_Position(MxCsr, MxCsr_PM, MxCsr, MxCsr_OM));
         mRegisterMapping.insert(MxCsr_PM, "MxCsr_PM");
         mRegisterPlaces.insert(MxCsr_PM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_PM, Register_Relative_Position(MxCsr_FZ, MxCsr_UM, MxCsr, MxCsr_ZM));
         mRegisterMapping.insert(MxCsr_UM, "MxCsr_UM");
         mRegisterPlaces.insert(MxCsr_UM, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_UM, Register_Relative_Position(MxCsr_PM, MxCsr_OM, MxCsr, MxCsr_IM));
 
         mRegisterMapping.insert(MxCsr_OM, "MxCsr_OM");
         mRegisterPlaces.insert(MxCsr_OM, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(MxCsr_OM, Register_Relative_Position(MxCsr_UM, MxCsr_ZM, MxCsr_FZ, MxCsr_UE));
         mRegisterMapping.insert(MxCsr_ZM, "MxCsr_ZM");
         mRegisterPlaces.insert(MxCsr_ZM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_ZM, Register_Relative_Position(MxCsr_OM, MxCsr_IM, MxCsr_PM, MxCsr_PE));
         mRegisterMapping.insert(MxCsr_IM, "MxCsr_IM");
         mRegisterPlaces.insert(MxCsr_IM, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_IM, Register_Relative_Position(MxCsr_ZM, MxCsr_UE, MxCsr_UM, MxCsr_DAZ));
 
         mRegisterMapping.insert(MxCsr_UE, "MxCsr_UE");
         mRegisterPlaces.insert(MxCsr_UE, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(MxCsr_UE, Register_Relative_Position(MxCsr_IM, MxCsr_PE, MxCsr_OM, MxCsr_OE));
         mRegisterMapping.insert(MxCsr_PE, "MxCsr_PE");
         mRegisterPlaces.insert(MxCsr_PE, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_PE, Register_Relative_Position(MxCsr_UE, MxCsr_DAZ, MxCsr_ZM, MxCsr_ZE));
         mRegisterMapping.insert(MxCsr_DAZ, "MxCsr_DAZ");
         mRegisterPlaces.insert(MxCsr_DAZ, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_DAZ, Register_Relative_Position(MxCsr_PE, MxCsr_OE, MxCsr_IM, MxCsr_DE));
 
         mRegisterMapping.insert(MxCsr_OE, "MxCsr_OE");
         mRegisterPlaces.insert(MxCsr_OE, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(MxCsr_OE, Register_Relative_Position(MxCsr_DAZ, MxCsr_ZE, MxCsr_UE, MxCsr_IE));
         mRegisterMapping.insert(MxCsr_ZE, "MxCsr_ZE");
         mRegisterPlaces.insert(MxCsr_ZE, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_ZE, Register_Relative_Position(MxCsr_OE, MxCsr_DE, MxCsr_PE, MxCsr_DM));
         mRegisterMapping.insert(MxCsr_DE, "MxCsr_DE");
         mRegisterPlaces.insert(MxCsr_DE, Register_Position(offset++, 25, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_DE, Register_Relative_Position(MxCsr_ZE, MxCsr_IE, MxCsr_DAZ, MxCsr_RC));
 
         mRegisterMapping.insert(MxCsr_IE, "MxCsr_IE");
         mRegisterPlaces.insert(MxCsr_IE, Register_Position(offset, 0, 9, 1));
+        mRegisterRelativePlaces.insert(MxCsr_IE, Register_Relative_Position(MxCsr_DE, MxCsr_DM, MxCsr_OE, MM0));
         mRegisterMapping.insert(MxCsr_DM, "MxCsr_DM");
         mRegisterPlaces.insert(MxCsr_DM, Register_Position(offset, 12, 10, 1));
+        mRegisterRelativePlaces.insert(MxCsr_DM, Register_Relative_Position(MxCsr_IE, MxCsr_RC, MxCsr_ZE, MM0));
         mRegisterMapping.insert(MxCsr_RC, "MxCsr_RC");
         mRegisterPlaces.insert(MxCsr_RC, Register_Position(offset++, 25, 10, 19));
+        mRegisterRelativePlaces.insert(MxCsr_RC, Register_Relative_Position(MxCsr_DM, MM0, MxCsr_DE, MM0));
+
 
         offset++;
 
         mRegisterMapping.insert(MM0, "MM0");
         mRegisterPlaces.insert(MM0, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM0, Register_Relative_Position(MxCsr_RC, MM1));
         mRegisterMapping.insert(MM1, "MM1");
         mRegisterPlaces.insert(MM1, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM1, Register_Relative_Position(MM0, MM2));
         mRegisterMapping.insert(MM2, "MM2");
         mRegisterPlaces.insert(MM2, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM2, Register_Relative_Position(MM1, MM3));
         mRegisterMapping.insert(MM3, "MM3");
         mRegisterPlaces.insert(MM3, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM3, Register_Relative_Position(MM2, MM4));
         mRegisterMapping.insert(MM4, "MM4");
         mRegisterPlaces.insert(MM4, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM4, Register_Relative_Position(MM3, MM5));
         mRegisterMapping.insert(MM5, "MM5");
         mRegisterPlaces.insert(MM5, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM5, Register_Relative_Position(MM4, MM6));
         mRegisterMapping.insert(MM6, "MM6");
         mRegisterPlaces.insert(MM6, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM6, Register_Relative_Position(MM5, MM7));
         mRegisterMapping.insert(MM7, "MM7");
         mRegisterPlaces.insert(MM7, Register_Position(offset++, 0, 4, 8 * 2));
+        mRegisterRelativePlaces.insert(MM7, Register_Relative_Position(MM6, XMM0));
+
 
         offset++;
 
         mRegisterMapping.insert(XMM0, "XMM0");
         mRegisterPlaces.insert(XMM0, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM0, Register_Relative_Position(MM7, XMM1));
         mRegisterMapping.insert(XMM1, "XMM1");
         mRegisterPlaces.insert(XMM1, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM1, Register_Relative_Position(XMM0, XMM2));
         mRegisterMapping.insert(XMM2, "XMM2");
         mRegisterPlaces.insert(XMM2, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM2, Register_Relative_Position(XMM1, XMM3));
         mRegisterMapping.insert(XMM3, "XMM3");
         mRegisterPlaces.insert(XMM3, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM3, Register_Relative_Position(XMM2, XMM4));
         mRegisterMapping.insert(XMM4, "XMM4");
         mRegisterPlaces.insert(XMM4, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM4, Register_Relative_Position(XMM3, XMM5));
         mRegisterMapping.insert(XMM5, "XMM5");
         mRegisterPlaces.insert(XMM5, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM5, Register_Relative_Position(XMM4, XMM6));
         mRegisterMapping.insert(XMM6, "XMM6");
         mRegisterPlaces.insert(XMM6, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM6, Register_Relative_Position(XMM5, XMM7));
+#ifdef _WIN64
         mRegisterMapping.insert(XMM7, "XMM7");
         mRegisterPlaces.insert(XMM7, Register_Position(offset++, 0, 6, 16 * 2));
-#ifdef _WIN64
+        mRegisterRelativePlaces.insert(XMM7, Register_Relative_Position(XMM6, XMM8));
         mRegisterMapping.insert(XMM8, "XMM8");
         mRegisterPlaces.insert(XMM8, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM8, Register_Relative_Position(XMM7, XMM9));
         mRegisterMapping.insert(XMM9, "XMM9");
         mRegisterPlaces.insert(XMM9, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM9, Register_Relative_Position(XMM8, XMM10));
         mRegisterMapping.insert(XMM10, "XMM10");
         mRegisterPlaces.insert(XMM10, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM10, Register_Relative_Position(XMM9, XMM11));
         mRegisterMapping.insert(XMM11, "XMM11");
         mRegisterPlaces.insert(XMM11, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM11, Register_Relative_Position(XMM10, XMM12));
         mRegisterMapping.insert(XMM12, "XMM12");
         mRegisterPlaces.insert(XMM12, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM12, Register_Relative_Position(XMM11, XMM13));
         mRegisterMapping.insert(XMM13, "XMM13");
         mRegisterPlaces.insert(XMM13, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM13, Register_Relative_Position(XMM12, XMM14));
         mRegisterMapping.insert(XMM14, "XMM14");
         mRegisterPlaces.insert(XMM14, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM14, Register_Relative_Position(XMM13, XMM15));
         mRegisterMapping.insert(XMM15, "XMM15");
         mRegisterPlaces.insert(XMM15, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM15, Register_Relative_Position(XMM14, YMM0));
+#else
+        mRegisterMapping.insert(XMM7, "XMM7");
+        mRegisterPlaces.insert(XMM7, Register_Position(offset++, 0, 6, 16 * 2));
+        mRegisterRelativePlaces.insert(XMM7, Register_Relative_Position(XMM6, YMM0));
 #endif
 
         offset++;
 
+#ifdef _WIN64
         mRegisterMapping.insert(YMM0, "YMM0");
         mRegisterPlaces.insert(YMM0, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM0, Register_Relative_Position(XMM15, YMM1));
+#else
+        mRegisterMapping.insert(YMM0, "YMM0");
+        mRegisterPlaces.insert(YMM0, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM0, Register_Relative_Position(XMM7, YMM1));
+#endif
         mRegisterMapping.insert(YMM1, "YMM1");
         mRegisterPlaces.insert(YMM1, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM1, Register_Relative_Position(YMM0, YMM2));
         mRegisterMapping.insert(YMM2, "YMM2");
         mRegisterPlaces.insert(YMM2, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM2, Register_Relative_Position(YMM1, YMM3));
         mRegisterMapping.insert(YMM3, "YMM3");
         mRegisterPlaces.insert(YMM3, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM3, Register_Relative_Position(YMM2, YMM4));
         mRegisterMapping.insert(YMM4, "YMM4");
         mRegisterPlaces.insert(YMM4, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM4, Register_Relative_Position(YMM3, YMM5));
         mRegisterMapping.insert(YMM5, "YMM5");
         mRegisterPlaces.insert(YMM5, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM5, Register_Relative_Position(YMM4, YMM6));
         mRegisterMapping.insert(YMM6, "YMM6");
         mRegisterPlaces.insert(YMM6, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM6, Register_Relative_Position(YMM5, YMM7));
+#ifdef _WIN64
         mRegisterMapping.insert(YMM7, "YMM7");
         mRegisterPlaces.insert(YMM7, Register_Position(offset++, 0, 6, 32 * 2));
-#ifdef _WIN64
+        mRegisterRelativePlaces.insert(YMM7, Register_Relative_Position(YMM6, YMM8));
         mRegisterMapping.insert(YMM8, "YMM8");
         mRegisterPlaces.insert(YMM8, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM8, Register_Relative_Position(YMM7, YMM9));
         mRegisterMapping.insert(YMM9, "YMM9");
         mRegisterPlaces.insert(YMM9, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM9, Register_Relative_Position(YMM8, YMM10));
         mRegisterMapping.insert(YMM10, "YMM10");
         mRegisterPlaces.insert(YMM10, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM10, Register_Relative_Position(YMM9, YMM11));
         mRegisterMapping.insert(YMM11, "YMM11");
         mRegisterPlaces.insert(YMM11, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM11, Register_Relative_Position(YMM10, YMM12));
         mRegisterMapping.insert(YMM12, "YMM12");
         mRegisterPlaces.insert(YMM12, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM12, Register_Relative_Position(YMM11, YMM13));
         mRegisterMapping.insert(YMM13, "YMM13");
         mRegisterPlaces.insert(YMM13, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM13, Register_Relative_Position(YMM12, YMM14));
         mRegisterMapping.insert(YMM14, "YMM14");
         mRegisterPlaces.insert(YMM14, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM14, Register_Relative_Position(YMM13, YMM15));
         mRegisterMapping.insert(YMM15, "YMM15");
         mRegisterPlaces.insert(YMM15, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM15, Register_Relative_Position(YMM14, DR0));
+#else
+        mRegisterMapping.insert(YMM7, "YMM7");
+        mRegisterPlaces.insert(YMM7, Register_Position(offset++, 0, 6, 32 * 2));
+        mRegisterRelativePlaces.insert(YMM7, Register_Relative_Position(YMM6, DR0));
 #endif
+    }
+    else
+    {
+        mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, DR0));
+        mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, DR0, DS, DR0));
     }
 
     offset++;
+
+    if(mShowFpu)
+    {
+#ifdef _WIN64
+        mRegisterRelativePlaces.insert(DR0, Register_Relative_Position(YMM15, DR1));
+#else
+        mRegisterRelativePlaces.insert(DR0, Register_Relative_Position(YMM7, DR1));
+#endif
+    }
+    else
+    {
+        mRegisterRelativePlaces.insert(DR0, Register_Relative_Position(SS, DR1));
+    }
 
     mRegisterMapping.insert(DR0, "DR0");
     mRegisterPlaces.insert(DR0, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
     mRegisterMapping.insert(DR1, "DR1");
     mRegisterPlaces.insert(DR1, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(DR1, Register_Relative_Position(DR0, DR2));
     mRegisterMapping.insert(DR2, "DR2");
     mRegisterPlaces.insert(DR2, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(DR2, Register_Relative_Position(DR1, DR3));
     mRegisterMapping.insert(DR3, "DR3");
     mRegisterPlaces.insert(DR3, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(DR3, Register_Relative_Position(DR2, DR6));
     mRegisterMapping.insert(DR6, "DR6");
     mRegisterPlaces.insert(DR6, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(DR6, Register_Relative_Position(DR3, DR7));
     mRegisterMapping.insert(DR7, "DR7");
     mRegisterPlaces.insert(DR7, Register_Position(offset++, 0, 4, sizeof(duint) * 2));
+    mRegisterRelativePlaces.insert(DR7, Register_Relative_Position(DR6, UNKNOWN));
 
     mRowsNeeded = offset + 1;
 }
@@ -454,6 +685,7 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     connect(Bridge::getBridge(), SIGNAL(close()), this, SLOT(onClose()));
     switch(ConfigUint("Gui", "SIMDRegistersDisplayMode"))
     {
+    default:
     case 0:
         wSIMDRegDispMode = SIMD_REG_DISP_HEX;
         break;
@@ -491,6 +723,7 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
         wSIMDRegDispMode = SIMD_REG_DISP_QWORD_HEX;
         break;
     }
+    mFpuMode = false;
 
     // precreate ContextMenu Actions
     wCM_Increment = setupAction(DIcon("register_inc.png"), tr("Increment"), this);
@@ -501,8 +734,9 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     wCM_Modify->setShortcut(QKeySequence(Qt::Key_Enter));
     wCM_ToggleValue = setupAction(DIcon("register_toggle.png"), tr("Toggle"), this);
     wCM_Undo = setupAction(DIcon("undo.png"), tr("Undo"), this);
-    wCM_CopyToClipboard = setupAction(DIcon("copy.png"), tr("Copy value to clipboard"), this);
-    wCM_CopySymbolToClipboard = setupAction(DIcon("pdb.png"), tr("Copy Symbol Value to Clipboard"), this);
+    wCM_CopyToClipboard = setupAction(DIcon("copy.png"), tr("Copy value"), this);
+    wCM_CopyFloatingPointValueToClipboard = setupAction(DIcon("copy.png"), tr("Copy floating point value"), this);
+    wCM_CopySymbolToClipboard = setupAction(DIcon("pdb.png"), tr("Copy Symbol Value"), this);
     wCM_CopyAll = setupAction(DIcon("copy-alt.png"), tr("Copy all registers"), this);
     wCM_FollowInDisassembly = new QAction(DIcon(QString("processor%1.png").arg(ArchValue("32", "64"))), tr("Follow in Disassembler"), this);
     wCM_FollowInDump = new QAction(DIcon("dump.png"), tr("Follow in Dump"), this);
@@ -518,6 +752,8 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     wCM_Highlight = setupAction(DIcon("highlight.png"), tr("Highlight"), this);
     mSwitchSIMDDispMode = new QMenu(tr("Change SIMD Register Display Mode"), this);
     mSwitchSIMDDispMode->setIcon(DIcon("simdmode.png"));
+    mSwitchFPUDispMode = new QAction(tr("Display ST(x)"), this);
+    mSwitchFPUDispMode->setCheckable(true);
     SIMDHex = new QAction(tr("Hexadecimal"), mSwitchSIMDDispMode);
     SIMDFloat = new QAction(tr("Float"), mSwitchSIMDDispMode);
     SIMDDouble = new QAction(tr("Double"), mSwitchSIMDDispMode);
@@ -530,18 +766,31 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     SIMDHWord = new QAction(tr("Hexadecimal Word"), mSwitchSIMDDispMode);
     SIMDHDWord = new QAction(tr("Hexadecimal DWord"), mSwitchSIMDDispMode);
     SIMDHQWord = new QAction(tr("Hexadecimal QWord"), mSwitchSIMDDispMode);
-    connect(SIMDHex, SIGNAL(triggered()), this, SLOT(onSIMDHex()));
-    connect(SIMDFloat, SIGNAL(triggered()), this, SLOT(onSIMDFloat()));
-    connect(SIMDDouble, SIGNAL(triggered()), this, SLOT(onSIMDDouble()));
-    connect(SIMDSWord, SIGNAL(triggered()), this, SLOT(onSIMDSWord()));
-    connect(SIMDUWord, SIGNAL(triggered()), this, SLOT(onSIMDUWord()));
-    connect(SIMDHWord, SIGNAL(triggered()), this, SLOT(onSIMDHWord()));
-    connect(SIMDSDWord, SIGNAL(triggered()), this, SLOT(onSIMDSDWord()));
-    connect(SIMDUDWord, SIGNAL(triggered()), this, SLOT(onSIMDUDWord()));
-    connect(SIMDHDWord, SIGNAL(triggered()), this, SLOT(onSIMDHDWord()));
-    connect(SIMDSQWord, SIGNAL(triggered()), this, SLOT(onSIMDSQWord()));
-    connect(SIMDUQWord, SIGNAL(triggered()), this, SLOT(onSIMDUQWord()));
-    connect(SIMDHQWord, SIGNAL(triggered()), this, SLOT(onSIMDHQWord()));
+    SIMDHex->setData(QVariant(SIMD_REG_DISP_HEX));
+    SIMDFloat->setData(QVariant(SIMD_REG_DISP_FLOAT));
+    SIMDDouble->setData(QVariant(SIMD_REG_DISP_DOUBLE));
+    SIMDSWord->setData(QVariant(SIMD_REG_DISP_WORD_SIGNED));
+    SIMDUWord->setData(QVariant(SIMD_REG_DISP_WORD_UNSIGNED));
+    SIMDHWord->setData(QVariant(SIMD_REG_DISP_WORD_HEX));
+    SIMDSDWord->setData(QVariant(SIMD_REG_DISP_DWORD_SIGNED));
+    SIMDUDWord->setData(QVariant(SIMD_REG_DISP_DWORD_UNSIGNED));
+    SIMDHDWord->setData(QVariant(SIMD_REG_DISP_DWORD_HEX));
+    SIMDSQWord->setData(QVariant(SIMD_REG_DISP_QWORD_SIGNED));
+    SIMDUQWord->setData(QVariant(SIMD_REG_DISP_QWORD_UNSIGNED));
+    SIMDHQWord->setData(QVariant(SIMD_REG_DISP_QWORD_HEX));
+    connect(SIMDHex, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDFloat, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDDouble, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(mSwitchFPUDispMode, SIGNAL(triggered()), this, SLOT(onFpuMode()));
     SIMDHex->setCheckable(true);
     SIMDFloat->setCheckable(true);
     SIMDDouble->setCheckable(true);
@@ -558,7 +807,7 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     SIMDFloat->setChecked(false);
     SIMDDouble->setChecked(false);
     SIMDSWord->setChecked(false);
-    SIMDUWord->setChecked(true);
+    SIMDUWord->setChecked(false);
     SIMDHWord->setChecked(false);
     SIMDSDWord->setChecked(false);
     SIMDUDWord->setChecked(false);
@@ -652,77 +901,17 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     mMODIFYDISPLAY.insert(CDI);
     mUNDODISPLAY.insert(CDI);
 #ifdef _WIN64
-    mSETONEZEROTOGGLE.insert(R8);
-    mINCREMENTDECREMET.insert(R8);
-    mCANSTOREADDRESS.insert(R8);
-    mGPR.insert(R8);
-    mLABELDISPLAY.insert(R8);
-    mUINTDISPLAY.insert(R8);
-    mMODIFYDISPLAY.insert(R8);
-    mUNDODISPLAY.insert(R8);
-
-    mSETONEZEROTOGGLE.insert(R9);
-    mINCREMENTDECREMET.insert(R9);
-    mCANSTOREADDRESS.insert(R9);
-    mGPR.insert(R9);
-    mLABELDISPLAY.insert(R9);
-    mUINTDISPLAY.insert(R9);
-    mMODIFYDISPLAY.insert(R9);
-    mUNDODISPLAY.insert(R9);
-
-    mSETONEZEROTOGGLE.insert(R10);
-    mINCREMENTDECREMET.insert(R10);
-    mCANSTOREADDRESS.insert(R10);
-    mGPR.insert(R10);
-    mMODIFYDISPLAY.insert(R10);
-    mUNDODISPLAY.insert(R10);
-    mUINTDISPLAY.insert(R10);
-    mLABELDISPLAY.insert(R10);
-
-    mSETONEZEROTOGGLE.insert(R11);
-    mINCREMENTDECREMET.insert(R11);
-    mCANSTOREADDRESS.insert(R11);
-    mGPR.insert(R11);
-    mMODIFYDISPLAY.insert(R11);
-    mUNDODISPLAY.insert(R11);
-    mUINTDISPLAY.insert(R11);
-    mLABELDISPLAY.insert(R11);
-
-    mSETONEZEROTOGGLE.insert(R12);
-    mINCREMENTDECREMET.insert(R12);
-    mCANSTOREADDRESS.insert(R12);
-    mGPR.insert(R12);
-    mMODIFYDISPLAY.insert(R12);
-    mUNDODISPLAY.insert(R12);
-    mUINTDISPLAY.insert(R12);
-    mLABELDISPLAY.insert(R12);
-
-    mSETONEZEROTOGGLE.insert(R13);
-    mINCREMENTDECREMET.insert(R13);
-    mCANSTOREADDRESS.insert(R13);
-    mGPR.insert(R13);
-    mMODIFYDISPLAY.insert(R13);
-    mUNDODISPLAY.insert(R13);
-    mUINTDISPLAY.insert(R13);
-    mLABELDISPLAY.insert(R13);
-
-    mSETONEZEROTOGGLE.insert(R14);
-    mINCREMENTDECREMET.insert(R14);
-    mCANSTOREADDRESS.insert(R14);
-    mGPR.insert(R14);
-    mMODIFYDISPLAY.insert(R14);
-    mUNDODISPLAY.insert(R14);
-    mUINTDISPLAY.insert(R14);
-    mLABELDISPLAY.insert(R14);
-
-    mSETONEZEROTOGGLE.insert(R15);
-    mINCREMENTDECREMET.insert(R15);
-    mCANSTOREADDRESS.insert(R15);
-    mGPR.insert(R15);
-    mMODIFYDISPLAY.insert(R15);
-    mUNDODISPLAY.insert(R15);
-    mUINTDISPLAY.insert(R15);
-    mLABELDISPLAY.insert(R15);
+    for(REGISTER_NAME i = R8; i <= R15; i = (REGISTER_NAME)(i + 1))
+    {
+        mSETONEZEROTOGGLE.insert(i);
+        mINCREMENTDECREMET.insert(i);
+        mCANSTOREADDRESS.insert(i);
+        mGPR.insert(i);
+        mLABELDISPLAY.insert(i);
+        mUINTDISPLAY.insert(i);
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+    }
 #endif //_WIN64
 
     mSETONEZEROTOGGLE.insert(EFLAGS);
@@ -774,53 +963,25 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     mUNDODISPLAY.insert(MxCsr);
     mFPU.insert(MxCsr);
 
-    mMODIFYDISPLAY.insert(x87r0);
-    mUNDODISPLAY.insert(x87r0);
-    mFPUx87.insert(x87r0);
-    mFPUx87_80BITSDISPLAY.insert(x87r0);
-    mFPU.insert(x87r0);
+    for(REGISTER_NAME i = x87r0; i <= x87r7; i = (REGISTER_NAME)(i + 1))
+    {
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+        mFPUx87.insert(i);
+        mFPUx87_80BITSDISPLAY.insert(i);
+        mFPU.insert(i);
+        mSETONEZEROTOGGLE.insert(i);
+    }
 
-    mMODIFYDISPLAY.insert(x87r1);
-    mUNDODISPLAY.insert(x87r1);
-    mFPUx87.insert(x87r1);
-    mFPUx87_80BITSDISPLAY.insert(x87r1);
-    mFPU.insert(x87r1);
-
-    mMODIFYDISPLAY.insert(x87r2);
-    mUNDODISPLAY.insert(x87r2);
-    mFPUx87.insert(x87r2);
-    mFPUx87_80BITSDISPLAY.insert(x87r2);
-    mFPU.insert(x87r2);
-
-    mMODIFYDISPLAY.insert(x87r3);
-    mUNDODISPLAY.insert(x87r3);
-    mFPUx87.insert(x87r3);
-    mFPUx87_80BITSDISPLAY.insert(x87r3);
-    mFPU.insert(x87r3);
-
-    mMODIFYDISPLAY.insert(x87r4);
-    mUNDODISPLAY.insert(x87r4);
-    mFPUx87.insert(x87r4);
-    mFPUx87_80BITSDISPLAY.insert(x87r4);
-    mFPU.insert(x87r4);
-
-    mMODIFYDISPLAY.insert(x87r5);
-    mUNDODISPLAY.insert(x87r5);
-    mFPUx87.insert(x87r5);
-    mFPU.insert(x87r5);
-    mFPUx87_80BITSDISPLAY.insert(x87r5);
-
-    mMODIFYDISPLAY.insert(x87r6);
-    mUNDODISPLAY.insert(x87r6);
-    mFPUx87.insert(x87r6);
-    mFPU.insert(x87r6);
-    mFPUx87_80BITSDISPLAY.insert(x87r6);
-
-    mMODIFYDISPLAY.insert(x87r7);
-    mUNDODISPLAY.insert(x87r7);
-    mFPUx87.insert(x87r7);
-    mFPU.insert(x87r7);
-    mFPUx87_80BITSDISPLAY.insert(x87r7);
+    for(REGISTER_NAME i = x87st0; i <= x87st7; i = (REGISTER_NAME)(i + 1))
+    {
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+        mFPUx87.insert(i);
+        mFPUx87_80BITSDISPLAY.insert(i);
+        mFPU.insert(i);
+        mSETONEZEROTOGGLE.insert(i);
+    }
 
     mSETONEZEROTOGGLE.insert(x87TagWord);
     mFPUx87.insert(x87TagWord);
@@ -925,61 +1086,15 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     mMODIFYDISPLAY.insert(x87CW_RC);
     mUNDODISPLAY.insert(x87CW_RC);
 
-    mFPUx87.insert(x87TW_0);
-    mFIELDVALUE.insert(x87TW_0);
-    mTAGWORD.insert(x87TW_0);
-    mFPU.insert(x87TW_0);
-    mMODIFYDISPLAY.insert(x87TW_0);
-    mUNDODISPLAY.insert(x87TW_0);
-
-    mFPUx87.insert(x87TW_1);
-    mFIELDVALUE.insert(x87TW_1);
-    mTAGWORD.insert(x87TW_1);
-    mFPU.insert(x87TW_1);
-    mMODIFYDISPLAY.insert(x87TW_1);
-    mUNDODISPLAY.insert(x87TW_1);
-
-    mFPUx87.insert(x87TW_2);
-    mFIELDVALUE.insert(x87TW_2);
-    mTAGWORD.insert(x87TW_2);
-    mFPU.insert(x87TW_2);
-    mMODIFYDISPLAY.insert(x87TW_2);
-    mUNDODISPLAY.insert(x87TW_2);
-
-    mFPUx87.insert(x87TW_3);
-    mFIELDVALUE.insert(x87TW_3);
-    mTAGWORD.insert(x87TW_3);
-    mFPU.insert(x87TW_3);
-    mMODIFYDISPLAY.insert(x87TW_3);
-    mUNDODISPLAY.insert(x87TW_3);
-
-    mFPUx87.insert(x87TW_4);
-    mFIELDVALUE.insert(x87TW_4);
-    mTAGWORD.insert(x87TW_4);
-    mFPU.insert(x87TW_4);
-    mMODIFYDISPLAY.insert(x87TW_4);
-    mUNDODISPLAY.insert(x87TW_4);
-
-    mFPUx87.insert(x87TW_5);
-    mFIELDVALUE.insert(x87TW_5);
-    mTAGWORD.insert(x87TW_5);
-    mFPU.insert(x87TW_5);
-    mMODIFYDISPLAY.insert(x87TW_5);
-    mUNDODISPLAY.insert(x87TW_5);
-
-    mFPUx87.insert(x87TW_6);
-    mFIELDVALUE.insert(x87TW_6);
-    mTAGWORD.insert(x87TW_6);
-    mFPU.insert(x87TW_6);
-    mMODIFYDISPLAY.insert(x87TW_6);
-    mUNDODISPLAY.insert(x87TW_6);
-
-    mFPUx87.insert(x87TW_7);
-    mFIELDVALUE.insert(x87TW_7);
-    mTAGWORD.insert(x87TW_7);
-    mFPU.insert(x87TW_7);
-    mMODIFYDISPLAY.insert(x87TW_7);
-    mUNDODISPLAY.insert(x87TW_7);
+    for(REGISTER_NAME i = x87TW_0; i <= x87TW_7; i = (REGISTER_NAME)(i + 1))
+    {
+        mFPUx87.insert(i);
+        mFIELDVALUE.insert(i);
+        mTAGWORD.insert(i);
+        mFPU.insert(i);
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+    }
 
     mFPUx87.insert(x87CW_PC);
     mFIELDVALUE.insert(x87CW_PC);
@@ -1078,173 +1193,30 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     mMODIFYDISPLAY.insert(MxCsr_RC);
     mUNDODISPLAY.insert(MxCsr_RC);
 
-    mMODIFYDISPLAY.insert(MM0);
-    mUNDODISPLAY.insert(MM0);
-    mFPUMMX.insert(MM0);
-    mFPU.insert(MM0);
-    mMODIFYDISPLAY.insert(MM1);
-    mUNDODISPLAY.insert(MM1);
-    mFPUMMX.insert(MM1);
-    mFPU.insert(MM1);
-    mFPUMMX.insert(MM2);
-    mMODIFYDISPLAY.insert(MM2);
-    mUNDODISPLAY.insert(MM2);
-    mFPU.insert(MM2);
-    mFPUMMX.insert(MM3);
-    mMODIFYDISPLAY.insert(MM3);
-    mUNDODISPLAY.insert(MM3);
-    mFPU.insert(MM3);
-    mFPUMMX.insert(MM4);
-    mMODIFYDISPLAY.insert(MM4);
-    mUNDODISPLAY.insert(MM4);
-    mFPU.insert(MM4);
-    mFPUMMX.insert(MM5);
-    mMODIFYDISPLAY.insert(MM5);
-    mUNDODISPLAY.insert(MM5);
-    mFPU.insert(MM5);
-    mFPUMMX.insert(MM6);
-    mMODIFYDISPLAY.insert(MM6);
-    mUNDODISPLAY.insert(MM6);
-    mFPU.insert(MM6);
-    mFPUMMX.insert(MM7);
-    mMODIFYDISPLAY.insert(MM7);
-    mUNDODISPLAY.insert(MM7);
-    mFPU.insert(MM7);
+    for(REGISTER_NAME i = MM0; i <= MM7; i = (REGISTER_NAME)(i + 1))
+    {
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+        mFPUMMX.insert(i);
+        mFPU.insert(i);
+    }
 
-    mFPUXMM.insert(XMM0);
-    mMODIFYDISPLAY.insert(XMM0);
-    mUNDODISPLAY.insert(XMM0);
-    mFPU.insert(XMM0);
-    mFPUXMM.insert(XMM1);
-    mMODIFYDISPLAY.insert(XMM1);
-    mUNDODISPLAY.insert(XMM1);
-    mFPU.insert(XMM1);
-    mFPUXMM.insert(XMM2);
-    mMODIFYDISPLAY.insert(XMM2);
-    mUNDODISPLAY.insert(XMM2);
-    mFPU.insert(XMM2);
-    mFPUXMM.insert(XMM3);
-    mMODIFYDISPLAY.insert(XMM3);
-    mUNDODISPLAY.insert(XMM3);
-    mFPU.insert(XMM3);
-    mFPUXMM.insert(XMM4);
-    mMODIFYDISPLAY.insert(XMM4);
-    mUNDODISPLAY.insert(XMM4);
-    mFPU.insert(XMM4);
-    mFPUXMM.insert(XMM5);
-    mMODIFYDISPLAY.insert(XMM5);
-    mUNDODISPLAY.insert(XMM5);
-    mFPU.insert(XMM5);
-    mFPUXMM.insert(XMM6);
-    mMODIFYDISPLAY.insert(XMM6);
-    mUNDODISPLAY.insert(XMM6);
-    mFPU.insert(XMM6);
-    mFPUXMM.insert(XMM7);
-    mMODIFYDISPLAY.insert(XMM7);
-    mUNDODISPLAY.insert(XMM7);
-    mFPU.insert(XMM7);
-#ifdef _WIN64
-    mFPUXMM.insert(XMM8);
-    mMODIFYDISPLAY.insert(XMM8);
-    mUNDODISPLAY.insert(XMM8);
-    mFPU.insert(XMM8);
-    mFPUXMM.insert(XMM9);
-    mMODIFYDISPLAY.insert(XMM9);
-    mUNDODISPLAY.insert(XMM9);
-    mFPU.insert(XMM9);
-    mFPUXMM.insert(XMM10);
-    mMODIFYDISPLAY.insert(XMM10);
-    mUNDODISPLAY.insert(XMM10);
-    mFPU.insert(XMM10);
-    mFPUXMM.insert(XMM11);
-    mMODIFYDISPLAY.insert(XMM11);
-    mUNDODISPLAY.insert(XMM11);
-    mFPU.insert(XMM11);
-    mFPUXMM.insert(XMM12);
-    mMODIFYDISPLAY.insert(XMM12);
-    mUNDODISPLAY.insert(XMM12);
-    mFPU.insert(XMM12);
-    mFPUXMM.insert(XMM13);
-    mMODIFYDISPLAY.insert(XMM13);
-    mUNDODISPLAY.insert(XMM13);
-    mFPU.insert(XMM13);
-    mFPUXMM.insert(XMM14);
-    mMODIFYDISPLAY.insert(XMM14);
-    mUNDODISPLAY.insert(XMM14);
-    mFPU.insert(XMM14);
-    mFPUXMM.insert(XMM15);
-    mMODIFYDISPLAY.insert(XMM15);
-    mUNDODISPLAY.insert(XMM15);
-    mFPU.insert(XMM15);
-#endif
+    for(REGISTER_NAME i = XMM0; i <= ArchValue(XMM7, XMM15); i = (REGISTER_NAME)(i + 1))
+    {
+        mFPUXMM.insert(i);
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+        mFPU.insert(i);
+    }
 
-    mFPUYMM.insert(YMM0);
-    mMODIFYDISPLAY.insert(YMM0);
-    mUNDODISPLAY.insert(YMM0);
-    mFPU.insert(YMM0);
-    mFPUYMM.insert(YMM1);
-    mMODIFYDISPLAY.insert(YMM1);
-    mUNDODISPLAY.insert(YMM1);
-    mFPU.insert(YMM1);
-    mFPUYMM.insert(YMM2);
-    mMODIFYDISPLAY.insert(YMM2);
-    mUNDODISPLAY.insert(YMM2);
-    mFPU.insert(YMM2);
-    mFPUYMM.insert(YMM3);
-    mMODIFYDISPLAY.insert(YMM3);
-    mUNDODISPLAY.insert(YMM3);
-    mFPU.insert(YMM3);
-    mFPUYMM.insert(YMM4);
-    mMODIFYDISPLAY.insert(YMM4);
-    mUNDODISPLAY.insert(YMM4);
-    mFPU.insert(YMM4);
-    mFPUYMM.insert(YMM5);
-    mMODIFYDISPLAY.insert(YMM5);
-    mUNDODISPLAY.insert(YMM5);
-    mFPU.insert(YMM5);
-    mFPUYMM.insert(YMM6);
-    mMODIFYDISPLAY.insert(YMM6);
-    mUNDODISPLAY.insert(YMM6);
-    mFPU.insert(YMM6);
-    mFPUYMM.insert(YMM7);
-    mMODIFYDISPLAY.insert(YMM7);
-    mUNDODISPLAY.insert(YMM7);
-    mFPU.insert(YMM7);
+    for(REGISTER_NAME i = YMM0; i <= ArchValue(YMM7, YMM15); i = (REGISTER_NAME)(i + 1))
+    {
+        mFPUYMM.insert(i);
+        mMODIFYDISPLAY.insert(i);
+        mUNDODISPLAY.insert(i);
+        mFPU.insert(i);
+    }
 
-#ifdef _WIN64
-    mFPUYMM.insert(YMM8);
-    mMODIFYDISPLAY.insert(YMM8);
-    mUNDODISPLAY.insert(YMM8);
-    mFPU.insert(YMM8);
-    mFPUYMM.insert(YMM9);
-    mMODIFYDISPLAY.insert(YMM9);
-    mUNDODISPLAY.insert(YMM9);
-    mFPU.insert(YMM9);
-    mFPUYMM.insert(YMM10);
-    mMODIFYDISPLAY.insert(YMM10);
-    mUNDODISPLAY.insert(YMM10);
-    mFPU.insert(YMM10);
-    mFPUYMM.insert(YMM11);
-    mMODIFYDISPLAY.insert(YMM11);
-    mUNDODISPLAY.insert(YMM11);
-    mFPU.insert(YMM11);
-    mFPUYMM.insert(YMM12);
-    mMODIFYDISPLAY.insert(YMM12);
-    mUNDODISPLAY.insert(YMM12);
-    mFPU.insert(YMM12);
-    mFPUYMM.insert(YMM13);
-    mMODIFYDISPLAY.insert(YMM13);
-    mUNDODISPLAY.insert(YMM13);
-    mFPU.insert(YMM13);
-    mFPUYMM.insert(YMM14);
-    mMODIFYDISPLAY.insert(YMM14);
-    mUNDODISPLAY.insert(YMM14);
-    mFPU.insert(YMM14);
-    mFPUYMM.insert(YMM15);
-    mMODIFYDISPLAY.insert(YMM15);
-    mUNDODISPLAY.insert(YMM15);
-    mFPU.insert(YMM15);
-#endif
     //registers that should not be changed
     mNoChange.insert(LastError);
     mNoChange.insert(LastStatus);
@@ -1346,6 +1318,7 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     connect(wCM_ToggleValue, SIGNAL(triggered()), this, SLOT(onToggleValueAction()));
     connect(wCM_Undo, SIGNAL(triggered()), this, SLOT(onUndoAction()));
     connect(wCM_CopyToClipboard, SIGNAL(triggered()), this, SLOT(onCopyToClipboardAction()));
+    connect(wCM_CopyFloatingPointValueToClipboard, SIGNAL(triggered()), this, SLOT(onCopyFloatingPointToClipboardAction()));
     connect(wCM_CopySymbolToClipboard, SIGNAL(triggered()), this, SLOT(onCopySymbolToClipboardAction()));
     connect(wCM_CopyAll, SIGNAL(triggered()), this, SLOT(onCopyAllAction()));
     connect(wCM_FollowInDisassembly, SIGNAL(triggered()), this, SLOT(onFollowInDisassembly()));
@@ -1445,10 +1418,11 @@ void RegistersView::fontsUpdatedSlot()
     wRowsHeight = (wRowsHeight % 2) == 0 ? wRowsHeight : wRowsHeight + 1;
     mRowHeight = wRowsHeight;
     mCharWidth = QFontMetrics(this->font()).averageCharWidth();
-    //adjust the height of the area.
-    setFixedHeight(getEstimateHeight());
+
     //reload layout because the layout is dependent on the font.
     InitMappings();
+    //adjust the height of the area.
+    setFixedHeight(getEstimateHeight());
     reload();
 }
 
@@ -1691,15 +1665,15 @@ void RegistersView::mousePressEvent(QMouseEvent* event)
             if(CPUDisassemblyView->isHighlightMode())
             {
                 if(mGPR.contains(r) && r != REGISTER_NAME::EFLAGS)
-                    CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(r).value()));
+                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(r).value()));
                 else if(mFPUMMX.contains(r))
-                    CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(r).value()));
+                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(r).value()));
                 else if(mFPUXMM.contains(r))
-                    CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(r).value()));
+                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(r).value()));
                 else if(mFPUYMM.contains(r))
-                    CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(r).value()));
+                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(r).value()));
                 else if(mSEGMENTREGISTER.contains(r))
-                    CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(r).value()));
+                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(r).value()));
                 else
                     mSelected = r;
             }
@@ -1792,10 +1766,39 @@ void RegistersView::paintEvent(QPaintEvent* event)
 
 void RegistersView::keyPressEvent(QKeyEvent* event)
 {
-    if(!DbgIsDebugging())
-        return;
-    if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
-        wCM_Modify->trigger();
+    if(DbgIsDebugging())
+    {
+        int key = event->key();
+        REGISTER_NAME newRegister = UNKNOWN;
+
+        switch(key)
+        {
+        case Qt::Key_Enter:
+        case Qt::Key_Return:
+            wCM_Modify->trigger();
+            break;
+        case Qt::Key_Left:
+            newRegister = mRegisterRelativePlaces[mSelected].left;
+            break;
+        case Qt::Key_Right:
+            newRegister = mRegisterRelativePlaces[mSelected].right;
+            break;
+        case Qt::Key_Up:
+            newRegister = mRegisterRelativePlaces[mSelected].up;
+            break;
+        case Qt::Key_Down:
+            newRegister = mRegisterRelativePlaces[mSelected].down;
+            break;
+        }
+
+        if(newRegister != UNKNOWN)
+        {
+            mSelected = newRegister;
+            ensureRegisterVisible(newRegister);
+            emit refresh();
+        }
+    }
+    QScrollArea::keyPressEvent(event);
 }
 
 QSize RegistersView::sizeHint() const
@@ -1895,18 +1898,20 @@ static QString composeRegTextXMM(const char* value, RegistersView::SIMD_REG_DISP
     {
         const double* dbl_values = reinterpret_cast<const double*>(value);
         if(bFpuRegistersLittleEndian)
-            valueText = QString::number(dbl_values[0]) + ' ' + QString::number(dbl_values[1]);
+            valueText = ToDoubleString(&dbl_values[0]) + ' ' + ToDoubleString(&dbl_values[1]);
         else // Big Endian
-            valueText = QString::number(dbl_values[1]) + ' ' + QString::number(dbl_values[0]);
+            valueText = ToDoubleString(&dbl_values[1]) + ' ' + ToDoubleString(&dbl_values[0]);
     }
     break;
     case RegistersView::SIMD_REG_DISP_FLOAT:
     {
         const float* flt_values = reinterpret_cast<const float*>(value);
         if(bFpuRegistersLittleEndian)
-            valueText = QString::number(flt_values[0]) + ' ' + QString::number(flt_values[1]) + ' ' + QString::number(flt_values[2]) + ' ' + QString::number(flt_values[3]);
+            valueText = ToFloatString(&flt_values[0]) + ' ' + ToFloatString(&flt_values[1]) + ' '
+                        + ToFloatString(&flt_values[2]) + ' ' + ToFloatString(&flt_values[3]);
         else // Big Endian
-            valueText = QString::number(flt_values[3]) + ' ' + QString::number(flt_values[2]) + ' ' + QString::number(flt_values[1]) + ' ' + QString::number(flt_values[0]);
+            valueText = ToFloatString(&flt_values[3]) + ' ' + ToFloatString(&flt_values[2]) + ' '
+                        + ToFloatString(&flt_values[1]) + ' ' + ToFloatString(&flt_values[0]);
     }
     break;
     case RegistersView::SIMD_REG_DISP_WORD_HEX:
@@ -2366,7 +2371,7 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
         uint8_t highlight = 0;
         for(const auto & reg : mHighlightRegs)
         {
-            if(!CapstoneTokenizer::tokenTextPoolEquals(regName, reg.first))
+            if(!ZydisTokenizer::tokenTextPoolEquals(regName, reg.first))
                 continue;
             highlight = reg.second;
             break;
@@ -2430,7 +2435,14 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
             if(mRegisterUpdates.contains(x87SW_TOP))
                 p->setPen(ConfigColor("RegistersModifiedColor"));
 
-            newText = QString("ST%1 ").arg(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, reg))->st_value);
+            if(reg >= x87r0 && reg <= x87r7)
+            {
+                newText = QString("ST%1 ").arg(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, reg))->st_value);
+            }
+            else
+            {
+                newText = QString("x87r%1 ").arg((wRegDumpStruct.x87StatusWordFields.TOP + (reg - x87st0)) & 7);
+            }
             width = fontMetrics.width(newText);
             p->drawText(x, y, width, mRowHeight, Qt::AlignVCenter, newText);
 
@@ -2440,38 +2452,8 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
 
             p->setPen(ConfigColor("RegistersExtraInfoColor"));
 
-            if(reg == x87r0 && mRegisterUpdates.contains(x87TW_0))
-            {
+            if(reg >= x87r0 && reg <= x87r7 && mRegisterUpdates.contains((REGISTER_NAME)(x87TW_0 + (reg - x87r0))))
                 p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r1 && mRegisterUpdates.contains(x87TW_1))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r2 && mRegisterUpdates.contains(x87TW_2))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r3 && mRegisterUpdates.contains(x87TW_3))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r4 && mRegisterUpdates.contains(x87TW_4))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r5 && mRegisterUpdates.contains(x87TW_5))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r6 && mRegisterUpdates.contains(x87TW_6))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
-            else if(reg == x87r7 && mRegisterUpdates.contains(x87TW_7))
-            {
-                p->setPen(ConfigColor("RegistersModifiedColor"));
-            }
 
             newText += GetTagWordStateString(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, reg))->tag) + QString(" ");
 
@@ -2540,20 +2522,21 @@ void RegistersView::ModifyFields(const QString & title, STRING_VALUE_TABLE_t* ta
     if(mQListWidget->selectedItems().count() != 1)
         return;
 
-    QListWidgetItem* item = mQListWidget->takeItem(mQListWidget->currentRow());
+    //QListWidgetItem* item = mQListWidget->takeItem(mQListWidget->currentRow());
+    QString itemText = mQListWidget->item(mQListWidget->currentRow())->text();
 
     duint value;
 
     for(i = 0; i < size; i++)
     {
-        if(QApplication::translate("RegistersView_ConstantsOfRegisters", table[i].string) + QString(" (%1)").arg(table[i].value, 0, 16) == item->text())
+        if(QApplication::translate("RegistersView_ConstantsOfRegisters", table[i].string) + QString(" (%1)").arg(table[i].value, 0, 16) == itemText)
             break;
     }
 
     value = table[i].value;
 
     setRegister(mSelected, (duint)value);
-    delete item;
+    //delete item;
 }
 
 #define MODIFY_FIELDS_DISPLAY(prefix, title, table) ModifyFields(prefix + QChar(' ') + QString(title), (STRING_VALUE_TABLE_t *) & table, SIZE_TABLE(table) )
@@ -2576,7 +2559,11 @@ void RegistersView::displayEditDialog()
         else if(mSelected == x87CW_PC)
             MODIFY_FIELDS_DISPLAY(tr("Edit"), "x87CW_PC", ControlWordPCValueStringTable);
         else if(mSelected == x87SW_TOP)
+        {
             MODIFY_FIELDS_DISPLAY(tr("Edit"), "x87SW_TOP", StatusWordTOPValueStringTable);
+            // if(mFpuMode == false)
+            updateRegistersSlot();
+        }
         else if(mFPUYMM.contains(mSelected))
         {
             EditFloatRegister mEditFloat(256, this);
@@ -2811,13 +2798,23 @@ void RegistersView::onPopAction()
 void RegistersView::onZeroAction()
 {
     if(mSETONEZEROTOGGLE.contains(mSelected))
-        setRegister(mSelected, 0);
+    {
+        if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
+            setRegister(mSelected, reinterpret_cast<duint>("\0\0\0\0\0\0\0\0\0")); //9 zeros and 1 terminating zero
+        else
+            setRegister(mSelected, 0);
+    }
 }
 
 void RegistersView::onSetToOneAction()
 {
     if(mSETONEZEROTOGGLE.contains(mSelected))
-        setRegister(mSelected, 1);
+    {
+        if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
+            setRegister(mSelected, reinterpret_cast<duint>("\0\0\0\0\0\0\0\x80\xFF\x3F"));
+        else
+            setRegister(mSelected, 1);
+    }
 }
 
 void RegistersView::onModifyAction()
@@ -2848,18 +2845,21 @@ void RegistersView::onUndoAction()
 
 void RegistersView::onCopyToClipboardAction()
 {
-    QClipboard* clipboard = QApplication::clipboard();
-    clipboard->setText(GetRegStringValueFromValue(mSelected, registerValue(&wRegDumpStruct, mSelected)));
+    Bridge::CopyToClipboard(GetRegStringValueFromValue(mSelected, registerValue(&wRegDumpStruct, mSelected)));
+}
+
+void RegistersView::onCopyFloatingPointToClipboardAction()
+{
+    Bridge::CopyToClipboard(ToLongDoubleString(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, mSelected))->data));
 }
 
 void RegistersView::onCopySymbolToClipboardAction()
 {
     if(mLABELDISPLAY.contains(mSelected))
     {
-        QClipboard* clipboard = QApplication::clipboard();
         QString symbol = getRegisterLabel(mSelected);
         if(symbol != "")
-            clipboard->setText(symbol);
+            Bridge::CopyToClipboard(symbol);
     }
 }
 
@@ -2867,15 +2867,15 @@ void RegistersView::onHighlightSlot()
 {
     Disassembly* CPUDisassemblyView = mParent->getDisasmWidget();
     if(mGPR.contains(mSelected) && mSelected != REGISTER_NAME::EFLAGS)
-        CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(mSelected).value()));
+        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(mSelected).value()));
     else if(mSEGMENTREGISTER.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(mSelected).value()));
+        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(mSelected).value()));
     else if(mFPUMMX.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(mSelected).value()));
+        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(mSelected).value()));
     else if(mFPUXMM.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(mSelected).value()));
+        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(mSelected).value()));
     else if(mFPUYMM.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(CapstoneTokenizer::SingleToken(CapstoneTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(mSelected).value()));
+        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(mSelected).value()));
     CPUDisassemblyView->reloadData();
 }
 
@@ -2941,6 +2941,7 @@ void RegistersView::onCopyAllAction()
     appendRegister(text, REGISTER_NAME::SS, "SS : ", "SS : ");
     if(mShowFpu)
     {
+
         appendRegister(text, REGISTER_NAME::x87r0, "x87r0 : ", "x87r0 : ");
         appendRegister(text, REGISTER_NAME::x87r1, "x87r1 : ", "x87r1 : ");
         appendRegister(text, REGISTER_NAME::x87r2, "x87r2 : ", "x87r2 : ");
@@ -3051,8 +3052,7 @@ void RegistersView::onCopyAllAction()
     appendRegister(text, REGISTER_NAME::DR6, "DR6 : ", "DR6 : ");
     appendRegister(text, REGISTER_NAME::DR7, "DR7 : ", "DR7 : ");
 
-    auto clipboard = QApplication::clipboard();
-    clipboard->setText(text);
+    Bridge::CopyToClipboard(text);
 }
 
 void RegistersView::onFollowInDisassembly()
@@ -3175,6 +3175,11 @@ void RegistersView::displayCustomContextMenuSlot(QPoint pos)
     SIMDSQWord->setChecked(SIMDSQWord == selectedAction);
     SIMDUQWord->setChecked(SIMDUQWord == selectedAction);
     SIMDHQWord->setChecked(SIMDHQWord == selectedAction);
+    if(mFpuMode)
+        mSwitchFPUDispMode->setText(tr("Display ST(x)"));
+    else
+        mSwitchFPUDispMode->setText(tr("Display x87rX"));
+    mSwitchFPUDispMode->setChecked(mFpuMode);
 
     if(mSelected != UNKNOWN)
     {
@@ -3202,6 +3207,10 @@ void RegistersView::displayCustomContextMenuSlot(QPoint pos)
         }
 
         wMenu.addAction(wCM_CopyToClipboard);
+        if(mFPUx87_80BITSDISPLAY.contains(mSelected))
+        {
+            wMenu.addAction(wCM_CopyFloatingPointValueToClipboard);
+        }
         wMenu.addAction(wCM_CopyAll);
         if(mLABELDISPLAY.contains(mSelected))
         {
@@ -3222,10 +3231,20 @@ void RegistersView::displayCustomContextMenuSlot(QPoint pos)
 
         if(mSETONEZEROTOGGLE.contains(mSelected))
         {
-            if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) >= 1)
-                wMenu.addAction(wCM_Zero);
-            if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) == 0)
-                wMenu.addAction(wCM_SetToOne);
+            if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
+            {
+                if(memcmp(registerValue(&wRegDumpStruct, mSelected), "\0\0\0\0\0\0\0\0\0", 10) != 0)
+                    wMenu.addAction(wCM_Zero);
+                if(memcmp(registerValue(&wRegDumpStruct, mSelected), "\0\0\0\0\0\0\0\x80\xFF\x3F", 10) != 0)
+                    wMenu.addAction(wCM_SetToOne);
+            }
+            else
+            {
+                if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) != 0)
+                    wMenu.addAction(wCM_Zero);
+                if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) == 0)
+                    wMenu.addAction(wCM_SetToOne);
+            }
         }
 
         if(mBOOLDISPLAY.contains(mSelected))
@@ -3257,6 +3276,7 @@ void RegistersView::displayCustomContextMenuSlot(QPoint pos)
         {
             wMenu.addMenu(mSwitchSIMDDispMode);
         }
+        wMenu.addAction(mSwitchFPUDispMode);
 
         wMenu.exec(this->mapToGlobal(pos));
     }
@@ -3266,6 +3286,7 @@ void RegistersView::displayCustomContextMenuSlot(QPoint pos)
         wMenu.addAction(wCM_ChangeFPUView);
         wMenu.addAction(wCM_CopyAll);
         wMenu.addMenu(mSwitchSIMDDispMode);
+        wMenu.addAction(mSwitchFPUDispMode);
         wMenu.addSeparator();
         QAction* wHwbpCsp = wMenu.addAction(DIcon("breakpoint.png"), tr("Set Hardware Breakpoint on %1").arg(ArchValue("ESP", "RSP")));
         QAction* wAction = wMenu.exec(this->mapToGlobal(pos));
@@ -3280,8 +3301,13 @@ void RegistersView::setRegister(REGISTER_NAME reg, duint value)
     // is register-id known?
     if(mRegisterMapping.contains(reg))
     {
-        // map "cax" to "eax" or "rax"
-        QString wRegName = mRegisterMapping.constFind(reg).value();
+        // map x87st0 to x87r0
+        QString wRegName;
+        if(reg >= x87st0 && reg <= x87st7)
+            wRegName = QString().sprintf("st%d", reg - x87st0);
+        else
+            // map "cax" to "eax" or "rax"
+            wRegName = mRegisterMapping.constFind(reg).value();
 
         // flags need to '_' infront
         if(mFlags.contains(reg))
@@ -3487,6 +3513,23 @@ char* RegistersView::registerValue(const REGDUMP* regd, const REGISTER_NAME reg)
         return (char*) &regd->x87FPURegisters[6];
     case x87r7:
         return (char*) &regd->x87FPURegisters[7];
+
+    case x87st0:
+        return (char*) &regd->x87FPURegisters[regd->x87StatusWordFields.TOP & 7];
+    case x87st1:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 1) & 7];
+    case x87st2:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 2) & 7];
+    case x87st3:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 3) & 7];
+    case x87st4:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 4) & 7];
+    case x87st5:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 5) & 7];
+    case x87st6:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 6) & 7];
+    case x87st7:
+        return (char*) &regd->x87FPURegisters[(regd->x87StatusWordFields.TOP + 7) & 7];
 
     case x87TagWord:
         return (char*) &regd->regcontext.x87fpu.TagWord;
@@ -3699,67 +3742,16 @@ void RegistersView::setRegisters(REGDUMP* reg)
     emit refresh();
 }
 
-void RegistersView::onSIMDHex()
+void RegistersView::onSIMDMode()
 {
-    wSIMDRegDispMode = SIMD_REG_DISP_HEX;
+    wSIMDRegDispMode = (SIMD_REG_DISP_MODE)(dynamic_cast<QAction*>(sender())->data().toInt());
     emit refresh();
 }
 
-void RegistersView::onSIMDFloat()
+void RegistersView::onFpuMode()
 {
-    wSIMDRegDispMode = SIMD_REG_DISP_FLOAT;
-    emit refresh();
-}
-
-void RegistersView::onSIMDDouble()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_DOUBLE;
-    emit refresh();
-}
-
-void RegistersView::onSIMDSWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_WORD_SIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDUWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_WORD_UNSIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDHWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_WORD_HEX;
-    emit refresh();
-}
-void RegistersView::onSIMDSDWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_DWORD_SIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDUDWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_DWORD_UNSIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDHDWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_DWORD_HEX;
-    emit refresh();
-}
-void RegistersView::onSIMDSQWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_QWORD_SIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDUQWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_QWORD_UNSIGNED;
-    emit refresh();
-}
-void RegistersView::onSIMDHQWord()
-{
-    wSIMDRegDispMode = SIMD_REG_DISP_QWORD_HEX;
+    mFpuMode = !mFpuMode;
+    InitMappings();
     emit refresh();
 }
 
@@ -3767,4 +3759,16 @@ void RegistersView::disasmSelectionChangedSlot(dsint va)
 {
     mHighlightRegs = mParent->getDisasmWidget()->DisassembleAt(va - mParent->getDisasmWidget()->getBase()).regsReferenced;
     emit refresh();
+}
+
+void RegistersView::ensureRegisterVisible(REGISTER_NAME reg)
+{
+    QScrollArea* upperScrollArea = (QScrollArea*)this->parentWidget()->parentWidget();
+
+    int ySpace = yTopSpacing;
+    if(mVScrollOffset != 0)
+        ySpace = 0;
+    int y = mRowHeight * (mRegisterPlaces[reg].line + mVScrollOffset) + ySpace;
+
+    upperScrollArea->ensureVisible(0, y);
 }

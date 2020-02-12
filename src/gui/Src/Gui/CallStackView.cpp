@@ -28,11 +28,11 @@ void CallStackView::setupContextMenu()
     });
     QIcon icon = DIcon(ArchValue("processor32.png", "processor64.png"));
     mMenuBuilder->addAction(makeAction(icon, tr("Follow &Address"), SLOT(followAddress())));
-    mMenuBuilder->addAction(makeAction(icon, tr("Follow &To"), SLOT(followTo())), [this](QMenu*)
+    mMenuBuilder->addAction(makeAction(icon, tr("Follow &To"), SLOT(followTo())));
+    QAction* mFollowFrom = mMenuBuilder->addAction(makeAction(icon, tr("Follow &From"), SLOT(followFrom())), [this](QMenu*)
     {
         return !getCellContent(getInitialSelection(), 2).isEmpty();
     });
-    QAction* mFollowFrom = mMenuBuilder->addAction(makeAction(icon, tr("Follow &From"), SLOT(followFrom())));
     mFollowFrom->setShortcutContext(Qt::WidgetShortcut);
     mFollowFrom->setShortcut(QKeySequence("enter"));
     connect(this, SIGNAL(enterPressedSignal()), this, SLOT(followFrom()));
@@ -91,7 +91,7 @@ void CallStackView::updateCallStack()
             setCellContent(i, 5, tr("System"));
             break;
         default:
-            setCellContent(i, 5, QString("%1").arg(party));
+            setCellContent(i, 5, QString::number(party));
             break;
         }
     }

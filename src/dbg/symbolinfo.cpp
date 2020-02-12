@@ -12,39 +12,17 @@
 #include "dbghelp_safe.h"
 #include "exception.h"
 #include "WinInet-Downloader/downslib.h"
+#include <shlwapi.h>
+
+duint symbolDownloadingBase = 0;
 
 struct SYMBOLCBDATA
 {
     CBSYMBOLENUM cbSymbolEnum;
-    void* user;
+    void* user = nullptr;
     std::vector<char> decoratedSymbol;
     std::vector<char> undecoratedSymbol;
 };
-
-/*static void SymEnumImports(duint Base, CBSYMBOLENUM EnumCallback, SYMBOLCBDATA & cbData)
-{
-    SYMBOLINFO symbol;
-    memset(&symbol, 0, sizeof(SYMBOLINFO));
-    symbol.isImported = true;
-    apienumimports(Base, [&](duint base, duint addr, const char* name, const char* moduleName)
-    {
-        cbData.decoratedSymbol[0] = '\0';
-        cbData.undecoratedSymbol[0] = '\0';
-
-        symbol.addr = addr;
-        symbol.decoratedSymbol = cbData.decoratedSymbol.data();
-        symbol.undecoratedSymbol = cbData.undecoratedSymbol.data();
-        strncpy_s(symbol.decoratedSymbol, MAX_SYM_NAME, name, _TRUNCATE);
-
-        // Convert a mangled/decorated C++ name to a readable format
-        if(!SafeUnDecorateSymbolName(name, symbol.undecoratedSymbol, MAX_SYM_NAME, UNDNAME_COMPLETE))
-            symbol.undecoratedSymbol = nullptr;
-        else if(!strcmp(symbol.decoratedSymbol, symbol.undecoratedSymbol))
-            symbol.undecoratedSymbol = nullptr;
-
-        EnumCallback(&symbol, cbData.user);
-    });
-}*/
 
 void SymEnum(duint Base, CBSYMBOLENUM EnumCallback, void* UserData)
 {
@@ -66,6 +44,15 @@ void SymEnum(duint Base, CBSYMBOLENUM EnumCallback, void* UserData)
                 symbolptr.symbol = &modInfo->exports.at(i);
                 cbData.cbSymbolEnum(&symbolptr, cbData.user);
             }
+
+            // Emit pseudo entry point symbol
+            {
+                SYMBOLPTR symbolptr;
+                symbolptr.modbase = Base;
+                symbolptr.symbol = &modInfo->entrySymbol;
+                cbData.cbSymbolEnum(&symbolptr, cbData.user);
+            }
+
             for(size_t i = 0; i < modInfo->imports.size(); i++)
             {
                 SYMBOLPTR symbolptr;
@@ -85,16 +72,6 @@ void SymEnum(duint Base, CBSYMBOLENUM EnumCallback, void* UserData)
             }
         }
     }
-
-    // Emit pseudo entry point symbol
-    /*SYMBOLINFO symbol;
-    memset(&symbol, 0, sizeof(SYMBOLINFO));
-    symbol.decoratedSymbol = "OptionalHeader.AddressOfEntryPoint";
-    symbol.addr = ModEntryFromAddr(Base);
-    if(symbol.addr)
-        EnumCallback(&symbol, UserData);
-
-    SymEnumImports(Base, EnumCallback, cbData);*/
 }
 
 void SymEnumFromCache(duint Base, CBSYMBOLENUM EnumCallback, void* UserData)
@@ -139,6 +116,11 @@ void SymUpdateModuleList()
 
 bool SymDownloadSymbol(duint Base, const char* SymbolStore)
 {
+    struct DownloadBaseGuard
+    {
+        DownloadBaseGuard(duint downloadBase) { symbolDownloadingBase = downloadBase; GuiRepaintTableView(); }
+        ~DownloadBaseGuard() { symbolDownloadingBase = 0; GuiRepaintTableView(); }
+    } g(Base);
 #define symprintf(format, ...) GuiSymbolLogAdd(StringUtils::sprintf(GuiTranslateText(format), __VA_ARGS__).c_str())
 
     // Default to Microsoft's symbol server
@@ -243,20 +225,8 @@ bool SymDownloadSymbol(duint Base, const char* SymbolStore)
             return false;
         }
 
-        // insert the downloaded symbol path in the beginning of the PDB load order
-        auto destPathUtf8 = StringUtils::Utf16ToUtf8(destinationPath);
-        for(auto it = info->pdbPaths.begin(); it != info->pdbPaths.end(); ++it)
-        {
-            if(*it == destPathUtf8)
-            {
-                info->pdbPaths.erase(it);
-                break;
-            }
-        }
-        info->pdbPaths.insert(info->pdbPaths.begin(), destPathUtf8);
-
         // trigger a symbol load
-        info->loadSymbols();
+        info->loadSymbols(StringUtils::Utf16ToUtf8(destinationPath), bForceLoadSymbols);
     }
 
     return true;
@@ -290,8 +260,23 @@ bool SymAddrFromName(const char* Name, duint* Address)
         return false;
 
     // Skip 'OrdinalXXX'
-    if(!_strnicmp(Name, "Ordinal", 7))
-        return false;
+    if(_strnicmp(Name, "Ordinal#", 8) == 0 && strlen(Name) > 8)
+    {
+        const char* Name1 = Name + 8;
+        bool notNonNumbersFound = true;
+        do
+        {
+            if(!(Name1[0] >= '0' && Name1[0] <= '9'))
+            {
+                notNonNumbersFound = false;
+                break;
+            }
+            Name1++;
+        }
+        while(Name1[0] != 0);
+        if(notNonNumbersFound)
+            return false;
+    }
 
     //TODO: refactor this in a function because this pattern will become common
     std::vector<duint> mods;
@@ -363,7 +348,38 @@ bool SymGetSourceLine(duint Cip, char* FileName, int* Line, DWORD* disp)
         *Line = lineInfo.lineNumber;
 
     if(FileName)
+    {
         strncpy_s(FileName, MAX_STRING_SIZE, lineInfo.sourceFile.c_str(), _TRUNCATE);
+
+        // Check if it was a full path
+        if(!PathIsRelativeW(StringUtils::Utf8ToUtf16(lineInfo.sourceFile).c_str()))
+            return true;
+
+        // Construct full path from pdb path
+        {
+            SHARED_ACQUIRE(LockModules);
+            MODINFO* info = ModInfoFromAddr(Cip);
+            if(!info)
+                return true;
+
+            String sourceFilePath = info->symbols->loadedSymbolPath();
+
+            // Strip the name, leaving only the file directory
+            size_t bslash = sourceFilePath.rfind('\\');
+            if(bslash != String::npos)
+                sourceFilePath.resize(bslash + 1);
+            sourceFilePath += lineInfo.sourceFile;
+
+            // Attempt to remap the source file if it exists (more heuristics could be added in the future)
+            if(FileExists(sourceFilePath.c_str()))
+            {
+                if(info->symbols->mapSourceFilePdbToDisk(lineInfo.sourceFile, sourceFilePath))
+                {
+                    strncpy_s(FileName, MAX_STRING_SIZE, sourceFilePath.c_str(), _TRUNCATE);
+                }
+            }
+        }
+    }
 
     return true;
 }

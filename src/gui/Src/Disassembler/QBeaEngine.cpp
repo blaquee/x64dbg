@@ -6,7 +6,7 @@
 QBeaEngine::QBeaEngine(int maxModuleSize)
     : _tokenizer(maxModuleSize), mCodeFoldingManager(nullptr), _bLongDataInst(false)
 {
-    CapstoneTokenizer::UpdateColors();
+    ZydisTokenizer::UpdateColors();
     UpdateDataInstructionMap();
     this->mEncodeMap = new EncodeMap();
 }
@@ -190,17 +190,17 @@ Instruction_t QBeaEngine::DisassembleAt(byte_t* data, duint size, duint origBase
             return DecodeDataAt(data, size, origBase, origInstRVA, type);
     }
     //tokenize
-    CapstoneTokenizer::InstructionToken cap;
+    ZydisTokenizer::InstructionToken cap;
     _tokenizer.Tokenize(origBase + origInstRVA, data, size, cap);
     int len = _tokenizer.Size();
 
-    const auto & cp = _tokenizer.GetCapstone();
+    const auto & cp = _tokenizer.GetZydis();
     bool success = cp.Success();
 
 
     auto branchType = Instruction_t::None;
     Instruction_t wInst;
-    if(success && cp.IsBranchType(Zydis::BTJmp | Zydis::BTCall | Zydis::BTRet | Zydis::BTLoop))
+    if(success && cp.IsBranchType(Zydis::BTJmp | Zydis::BTCall | Zydis::BTRet | Zydis::BTLoop | Zydis::BTXbegin))
     {
         wInst.branchDestination = DbgGetBranchDestination(origBase + origInstRVA);
         if(cp.IsBranchType(Zydis::BTUncondJmp))
@@ -270,7 +270,7 @@ Instruction_t QBeaEngine::DisassembleAt(byte_t* data, duint size, duint origBase
 Instruction_t QBeaEngine::DecodeDataAt(byte_t* data, duint size, duint origBase, duint origInstRVA, ENCODETYPE type)
 {
     //tokenize
-    CapstoneTokenizer::InstructionToken cap;
+    ZydisTokenizer::InstructionToken cap;
 
     auto infoIter = dataInstMap.find(type);
     if(infoIter == dataInstMap.end())
@@ -294,6 +294,11 @@ Instruction_t QBeaEngine::DecodeDataAt(byte_t* data, duint size, duint origBase,
     wInst.branchType = Instruction_t::None;
     wInst.branchDestination = 0;
     wInst.tokens = cap;
+    wInst.prefixSize = 0;
+    wInst.opcodeSize = len;
+    wInst.group1Size = 0;
+    wInst.group2Size = 0;
+    wInst.group3Size = 0;
 
     return wInst;
 }

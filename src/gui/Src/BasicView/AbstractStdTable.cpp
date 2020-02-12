@@ -240,7 +240,7 @@ QString AbstractStdTable::paintContent(QPainter* painter, dsint rowBase, int row
             }
         }
         painter->drawText(QRect(x + 4, y, w - 4, h), Qt::AlignVCenter | Qt::AlignLeft, text);
-        text = "";
+        text.clear();
     }
     else if(mHighlightText.length() && text.contains(mHighlightText, Qt::CaseInsensitive)) // TODO: case sensitive + regex highlighting
     {
@@ -261,7 +261,7 @@ QString AbstractStdTable::paintContent(QPainter* painter, dsint rowBase, int row
         //create rich text list
         RichTextPainter::CustomRichText_t curRichText;
         curRichText.flags = RichTextPainter::FlagColor;
-        curRichText.textColor = mTextColor;
+        curRichText.textColor = getCellColor(rowBase + rowOffset, col);
         curRichText.highlightColor = ConfigColor("SearchListViewHighlightColor");
         RichTextPainter::List richText;
         foreach(QString str, split)
@@ -273,7 +273,7 @@ QString AbstractStdTable::paintContent(QPainter* painter, dsint rowBase, int row
 
         //paint the rich text
         RichTextPainter::paintRichText(painter, x + 1, y, w, h, 4, richText, mFontMetrics);
-        text = "";
+        text.clear();
     }
     return text;
 }
@@ -590,12 +590,12 @@ void AbstractStdTable::setSingleSelection(int index)
     emit selectionChangedSignal(index);
 }
 
-int AbstractStdTable::getInitialSelection()
+int AbstractStdTable::getInitialSelection() const
 {
     return mSelection.firstSelectedIndex;
 }
 
-QList<int> AbstractStdTable::getSelection()
+QList<int> AbstractStdTable::getSelection() const
 {
     QList<int> selection;
     selection.reserve(mSelection.toIndex - mSelection.fromIndex);
@@ -657,7 +657,7 @@ void AbstractStdTable::selectAll()
     emit selectionChangedSignal(index);
 }
 
-bool AbstractStdTable::isSelected(int base, int offset)
+bool AbstractStdTable::isSelected(int base, int offset) const
 {
     int wIndex = base + offset;
 
@@ -897,6 +897,11 @@ void AbstractStdTable::setupCopyMenu(QMenu* copyMenu)
     //Copy->Separator
     copyMenu->addSeparator();
     //Copy->ColName
+    setupCopyColumnMenu(copyMenu);
+}
+
+void AbstractStdTable::setupCopyColumnMenu(QMenu* copyMenu)
+{
     for(int i = 0; i < getColumnCount(); i++)
     {
         if(!getCellContent(getInitialSelection(), i).length()) //skip empty cells
@@ -932,6 +937,11 @@ void AbstractStdTable::setupCopyMenu(MenuBuilder* copyMenu)
     //Copy->Separator
     copyMenu->addSeparator();
     //Copy->ColName
+    setupCopyColumnMenu(copyMenu);
+}
+
+void AbstractStdTable::setupCopyColumnMenu(MenuBuilder* copyMenu)
+{
     copyMenu->addBuilder(new MenuBuilder(this, [this](QMenu * menu)
     {
         for(int i = 0; i < getColumnCount(); i++)
@@ -998,4 +1008,29 @@ void AbstractStdTable::reloadData()
         sortRows(mSort.column, mSort.ascending);
     }
     AbstractTableView::reloadData();
+}
+
+duint AbstractStdTable::getDisassemblyPopupAddress(int mousex, int mousey)
+{
+    if(!bDisassemblyPopupEnabled) //No disassembly popup is meaningful for this table
+        return 0;
+    int c = getColumnIndexFromX(mousex);
+    int r = getTableOffset() + getIndexOffsetFromY(transY(mousey));
+    if(r < getRowCount())
+    {
+        QString cell = getCellContent(r, c);
+        duint addr;
+        bool ok = false;
+#ifdef _WIN64
+        addr = cell.toULongLong(&ok, 16);
+#else //x86
+        addr = cell.toULong(&ok, 16);
+#endif //_WIN64
+        if(!ok)
+            return 0;
+        else
+            return addr;
+    }
+    else
+        return 0;
 }

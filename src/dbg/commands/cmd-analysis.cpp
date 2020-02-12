@@ -188,6 +188,69 @@ bool cbDebugDownloadSymbol(int argc, char* argv[])
     return true;
 }
 
+bool cbDebugLoadSymbol(int argc, char* argv[])
+{
+    if(IsArgumentsLessThan(argc, 3))
+        return false;
+    //get some module information
+    duint modbase = ModBaseFromName(argv[1]);
+    if(!modbase)
+    {
+        dprintf(QT_TRANSLATE_NOOP("DBG", "Invalid module \"%s\"!\n"), argv[1]);
+        return false;
+    }
+    auto pdbFile = argv[2];
+    if(!FileExists(pdbFile))
+    {
+        dputs(QT_TRANSLATE_NOOP("DBG", "File does not exist!"));
+        return false;
+    }
+    bool forceLoad = argc > 3 && DbgEval(argv[3]);
+    EXCLUSIVE_ACQUIRE(LockModules);
+    auto info = ModInfoFromAddr(modbase);
+    if(!info)
+    {
+        // TODO: this really isn't supposed to happen, but could if the module is suddenly unloaded
+        dputs("module not found...");
+        return false;
+    }
+
+    // trigger a symbol load
+    if(!info->loadSymbols(pdbFile, forceLoad))
+    {
+        dputs(QT_TRANSLATE_NOOP("DBG", "Symbol load failed... See symbol log for more information"));
+        return false;
+    }
+    GuiSymbolRefreshCurrent();
+    dputs(QT_TRANSLATE_NOOP("DBG", "Done! See symbol log for more information"));
+    return true;
+}
+
+bool cbDebugUnloadSymbol(int argc, char* argv[])
+{
+    if(IsArgumentsLessThan(argc, 2))
+        return false;
+    //get some module information
+    duint modbase = ModBaseFromName(argv[1]);
+    if(!modbase)
+    {
+        dprintf(QT_TRANSLATE_NOOP("DBG", "Invalid module \"%s\"!\n"), argv[1]);
+        return false;
+    }
+    EXCLUSIVE_ACQUIRE(LockModules);
+    auto info = ModInfoFromAddr(modbase);
+    if(!info)
+    {
+        // TODO: this really isn't supposed to happen, but could if the module is suddenly unloaded
+        dputs("module not found...");
+        return false;
+    }
+    info->unloadSymbols();
+    GuiRepaintTableView();
+    dputs(QT_TRANSLATE_NOOP("DBG", "Done!"));
+    return true;
+}
+
 bool cbInstrImageinfo(int argc, char* argv[])
 {
     duint address;
@@ -364,6 +427,7 @@ bool cbInstrExhandlers(int argc, char* argv[])
 
 bool cbInstrExinfo(int argc, char* argv[])
 {
+    const unsigned int MASK_FACILITY_VISUALCPP = 0x006D0000;
     auto info = getLastExceptionInfo();
     const auto & record = info.ExceptionRecord;
     dputs_untranslated("EXCEPTION_DEBUG_INFO:");
@@ -373,6 +437,14 @@ bool cbInstrExinfo(int argc, char* argv[])
         exceptionName = ErrorCodeToName(record.ExceptionCode);
     if(exceptionName.size())
         dprintf_untranslated("           ExceptionCode: %08X (%s)\n", record.ExceptionCode, exceptionName.c_str());
+    else if((record.ExceptionCode & MASK_FACILITY_VISUALCPP) == MASK_FACILITY_VISUALCPP)  //delayhlp.cpp
+    {
+        auto possibleError = record.ExceptionCode & 0xFFFF;
+        exceptionName = ErrorCodeToName(possibleError);
+        if(!exceptionName.empty())
+            exceptionName = StringUtils::sprintf(" (Visual C++ %s)", exceptionName.c_str());
+        dprintf_untranslated("           ExceptionCode: %08X%s\n", record.ExceptionCode, exceptionName.c_str());
+    }
     else
         dprintf_untranslated("           ExceptionCode: %08X\n", record.ExceptionCode);
     dprintf_untranslated("          ExceptionFlags: %08X\n", record.ExceptionFlags);

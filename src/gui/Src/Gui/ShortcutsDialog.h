@@ -28,10 +28,13 @@ private slots:
     void on_btnSave_clicked();
     void on_btnClearShortcut_clicked();
     void rejectedSlot();
+    void on_FilterTextChanged(const QString & actionName);
 
 private:
     Ui::ShortcutsDialog* ui;
     QMap<QString, Configuration::Shortcut> ShortcutsBackup;
+    void filterShortcutsByName(const QString & nameFilter, QMap<QString, Configuration::Shortcut> & mapToFill);
+    void showShortcutsFiltered(const QString & actionName);
 };
 
 #endif // SHORTCUTSDIALOG_H

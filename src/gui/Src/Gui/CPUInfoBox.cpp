@@ -39,6 +39,8 @@ void CPUInfoBox::setupContextMenu()
     mCopyAddressAction = makeAction(tr("Address"), SLOT(copyAddress()));
     mCopyRvaAction = makeAction(tr("RVA"), SLOT(copyRva()));
     mCopyOffsetAction = makeAction(tr("File Offset"), SLOT(copyOffset()));
+    mCopyLineAction = makeAction(tr("Copy Line"), SLOT(copyLineSlot()));
+    setupShortcuts();
 }
 
 int CPUInfoBox::getHeight()
@@ -146,9 +148,11 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
             case size_dword:
                 sizeName = "dword ptr ";
                 break;
+#ifdef _WIN64
             case size_qword:
                 sizeName = "qword ptr ";
                 break;
+#endif //_WIN64
             default:
                 knownsize = false;
                 break;
@@ -257,7 +261,10 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
 
         std::sort(data.begin(), data.end(), [](const XREF_RECORD * A, const XREF_RECORD * B)
         {
-            return ((A->type < B->type) || (A->addr < B->addr));
+            if(A->type != B->type)
+                return (A->type < B->type);
+
+            return (A->addr < B->addr);
         });
 
         int t = XREF_NONE;
@@ -684,4 +691,10 @@ void CPUInfoBox::copyOffset()
 void CPUInfoBox::doubleClickedSlot()
 {
     followInDump(curAddr);
+}
+
+void CPUInfoBox::setupShortcuts()
+{
+    mCopyLineAction->setShortcut(ConfigShortcut("ActionCopyLine"));
+    addAction(mCopyLineAction);
 }

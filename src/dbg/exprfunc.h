@@ -12,6 +12,7 @@ namespace Exprfunc
     duint moduser(duint addr);
     duint modrva(duint addr);
     duint modheaderva(duint addr);
+    duint modisexport(duint addr);
 
     duint disasmsel();
     duint dumpsel();
@@ -46,6 +47,7 @@ namespace Exprfunc
     duint disbrfalse(duint addr);
     duint disnext(duint addr);
     duint disprev(duint addr);
+    duint disiscallsystem(duint addr);
 
     duint trenabled(duint addr);
     duint trhitcount(duint addr);
@@ -70,4 +72,11 @@ namespace Exprfunc
     duint argset(duint index, duint value);
 
     duint bpgoto(duint cip);
+
+    duint exfirstchance();
+    duint exaddr();
+    duint excode();
+    duint exflags();
+    duint exinfocount();
+    duint exinfo(duint index);
 }

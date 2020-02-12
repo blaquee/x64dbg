@@ -2,10 +2,9 @@
 #define DISASSEMBLY_H
 
 #include "AbstractTableView.h"
-#include "DisassemblyPopup.h"
+#include "QBeaEngine.h"
 
 class CodeFoldingHelper;
-class QBeaEngine;
 class MemoryPage;
 
 class Disassembly : public AbstractTableView
@@ -26,7 +25,6 @@ public:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
-    void leaveEvent(QEvent* event) override;
 
     // Keyboard Management
     void keyPressEvent(QKeyEvent* event) override;
@@ -61,15 +59,15 @@ public:
     // Selection Management
     void expandSelectionUpTo(dsint to);
     void setSingleSelection(dsint index);
-    dsint getInitialSelection();
-    dsint getSelectionSize();
-    dsint getSelectionStart();
-    dsint getSelectionEnd();
+    dsint getInitialSelection() const;
+    dsint getSelectionSize() const;
+    dsint getSelectionStart() const;
+    dsint getSelectionEnd() const;
     void selectNext(bool expand);
     void selectPrevious(bool expand);
     bool isSelected(dsint base, dsint offset);
-    bool isSelected(QList<Instruction_t>* buffer, int index);
-    duint getSelectedVa();
+    bool isSelected(QList<Instruction_t>* buffer, int index) const;
+    duint getSelectedVa() const;
 
     // Update/Reload/Refresh/Repaint
     void prepareData() override;
@@ -79,15 +77,15 @@ public:
     duint rvaToVa(dsint rva) const;
     void disassembleClear();
     const duint getBase() const;
-    duint getSize();
-    duint getTableOffsetRva();
+    duint getSize() const;
+    duint getTableOffsetRva() const;
 
     // history management
     void historyClear();
     void historyPrevious();
     void historyNext();
-    bool historyHasPrevious();
-    bool historyHasNext();
+    bool historyHasPrevious() const;
+    bool historyHasNext() const;
 
     //disassemble
     void disassembleAt(dsint parVA, dsint parCIP, bool history, dsint newTableOffset);
@@ -99,14 +97,14 @@ public:
     QString getAddrText(dsint cur_addr, char label[MAX_LABEL_SIZE], bool getLabel = true);
     void prepareDataCount(const QList<dsint> & wRVAs, QList<Instruction_t>* instBuffer);
     void prepareDataRange(dsint startRva, dsint endRva, const std::function<bool(int, const Instruction_t &)> & disassembled);
-    RichTextPainter::List getRichBytes(const Instruction_t & instr) const;
+    RichTextPainter::List getRichBytes(const Instruction_t & instr, bool isSelected) const;
 
     //misc
     void setCodeFoldingManager(CodeFoldingHelper* CodeFoldingManager);
+    duint getDisassemblyPopupAddress(int mousex, int mousey) override;
     void unfold(dsint rva);
-    void ShowDisassemblyPopup(duint addr, int x, int y);
-    bool hightlightToken(const CapstoneTokenizer::SingleToken & token);
-    bool isHighlightMode();
+    bool hightlightToken(const ZydisTokenizer::SingleToken & token);
+    bool isHighlightMode() const;
 
 signals:
     void selectionChanged(dsint parVA);
@@ -167,7 +165,6 @@ private:
     {
         dsint va;
         dsint tableOffset;
-        QString windowTitle;
     };
 
     QList<HistoryData> mVaHistory;
@@ -243,14 +240,13 @@ protected:
     duint mRvaDisplayBase;
     dsint mRvaDisplayPageBase;
     bool mHighlightingMode;
-    bool mPopupEnabled;
+    //bool mPopupEnabled;
     MemoryPage* mMemPage;
     QBeaEngine* mDisasm;
     bool mShowMnemonicBrief;
     XREF_INFO mXrefInfo;
     CodeFoldingHelper* mCodeFoldingManager;
-    DisassemblyPopup mDisassemblyPopup;
-    CapstoneTokenizer::SingleToken mHighlightToken;
+    ZydisTokenizer::SingleToken mHighlightToken;
     bool mPermanentHighlightingMode;
     bool mNoCurrentModuleText;
 };

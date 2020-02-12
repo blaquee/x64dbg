@@ -65,7 +65,6 @@ INCLUDEPATH += \
     Src/Bridge \
     Src/Global \
     Src/Utils \
-    Src/ThirdPartyLibs/snowman \
     Src/ThirdPartyLibs/ldconvert \
     ../zydis_wrapper \
     ../zydis_wrapper/zydis/include
@@ -83,7 +82,7 @@ SOURCES += \
     Src/BasicView/HexDump.cpp \
     Src/BasicView/AbstractTableView.cpp \
     Src/Disassembler/QBeaEngine.cpp \
-    Src/Disassembler/capstone_gui.cpp \
+    Src/Disassembler/ZydisTokenizer.cpp \
     Src/Memory/MemoryPage.cpp \
     Src/Bridge/Bridge.cpp \
     Src/BasicView/StdTable.cpp \
@@ -132,15 +131,12 @@ SOURCES += \
     Src/Gui/SelectFields.cpp \
     Src/Gui/ReferenceManager.cpp \
     Src/Bridge/BridgeResult.cpp \
-    Src/Gui/YaraRuleSelectionDialog.cpp \
     Src/Gui/SourceViewerManager.cpp \
     Src/Gui/SourceView.cpp \
     Src/Utils/ValidateExpressionThread.cpp \
     Src/Utils/MainWindowCloseThread.cpp \
     Src/Gui/TimeWastedCounter.cpp \
     Src/Utils/FlickerThread.cpp \
-    Src/QEntropyView/QEntropyView.cpp \
-    Src/Gui/EntropyDialog.cpp \
     Src/Gui/NotesManager.cpp \
     Src/Gui/NotepadView.cpp \
     Src/Gui/CPUMultiDump.cpp \
@@ -186,7 +182,8 @@ SOURCES += \
     Src/Gui/MultiItemsSelectWindow.cpp \
     Src/BasicView/AbstractStdTable.cpp \
     Src/Gui/ZehSymbolTable.cpp \
-    Src/BasicView/StdSearchListView.cpp
+    Src/BasicView/StdSearchListView.cpp \
+    Src/BasicView/StdTableSearchList.cpp
 
 
 HEADERS += \
@@ -198,7 +195,7 @@ HEADERS += \
     Src/BasicView/HexDump.h \
     Src/BasicView/AbstractTableView.h \
     Src/Disassembler/QBeaEngine.h \
-    Src/Disassembler/capstone_gui.h \
+    Src/Disassembler/ZydisTokenizer.h \
     Src/Memory/MemoryPage.h \
     Src/Bridge/Bridge.h \
     Src/Exports.h \
@@ -249,7 +246,6 @@ HEADERS += \
     Src/Gui/SelectFields.h \
     Src/Gui/ReferenceManager.h \
     Src/Bridge/BridgeResult.h \
-    Src/Gui/YaraRuleSelectionDialog.h \
     Src/Gui/SourceViewerManager.h \
     Src/Gui/SourceView.h \
     Src/Utils/StringUtil.h \
@@ -257,9 +253,6 @@ HEADERS += \
     Src/Utils/MainWindowCloseThread.h \
     Src/Gui/TimeWastedCounter.h \
     Src/Utils/FlickerThread.h \
-    Src/QEntropyView/Entropy.h \
-    Src/QEntropyView/QEntropyView.h \
-    Src/Gui/EntropyDialog.h \
     Src/Gui/NotesManager.h \
     Src/Gui/NotepadView.h \
     Src/Utils/MenuBuilder.h \
@@ -309,7 +302,10 @@ HEADERS += \
     Src/BasicView/AbstractStdTable.h \
     Src/Gui/ZehSymbolTable.h \
     Src/BasicView/AbstractSearchList.h \
-    Src/BasicView/StdSearchListView.h
+    Src/BasicView/StdSearchListView.h \
+    Src/Gui/FileLines.h \
+    Src/BasicView/StdTableSearchList.h \
+    Src/Utils/MethodInvoker.h
     
 
 FORMS += \
@@ -332,8 +328,6 @@ FORMS += \
     Src/Gui/AttachDialog.ui \
     Src/Gui/PageMemoryRights.ui \
     Src/Gui/SelectFields.ui \
-    Src/Gui/YaraRuleSelectionDialog.ui \
-    Src/Gui/EntropyDialog.ui \
     Src/Gui/AssembleDialog.ui \
     Src/Gui/EditBreakpointDialog.ui \
     Src/Gui/CPUArgumentWidget.ui \
@@ -359,13 +353,11 @@ LIBS += -luser32 -ladvapi32 -lwinmm -lshell32
 !contains(QMAKE_HOST.arch, x86_64) {
     # Windows x86 (32bit) specific build
     LIBS += -L"$$PWD/../zydis_wrapper/bin/x32$${DIR_SUFFIX}" -lzydis_wrapper
-    LIBS += -L"$$PWD/Src/ThirdPartyLibs/snowman" -lsnowman_x86
     LIBS += -L"$$PWD/Src/ThirdPartyLibs/ldconvert" -lldconvert_x86
     LIBS += -L"$${X64_BIN_DIR}" -lx32bridge
 } else {
     # Windows x64 (64bit) specific build
     LIBS += -L"$$PWD/../zydis_wrapper/bin/x64$${DIR_SUFFIX}" -lzydis_wrapper
-    LIBS += -L"$$PWD/Src/ThirdPartyLibs/snowman" -lsnowman_x64
     LIBS += -L"$$PWD/Src/ThirdPartyLibs/ldconvert" -lldconvert_x64
     LIBS += -L"$${X64_BIN_DIR}" -lx64bridge
 }

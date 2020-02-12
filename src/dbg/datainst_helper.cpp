@@ -114,14 +114,12 @@ duint decodesimpledata(const unsigned char* buffer, ENCODETYPE type)
 
 struct DataInstruction
 {
-    ENCODETYPE type;
+    ENCODETYPE type = enc_unknown;
     String operand;
 };
 
 bool parsedatainstruction(const char* instruction, DataInstruction & di)
 {
-    di.type = enc_unknown;
-    di.operand.clear();
     String instStr = StringUtils::Trim(String(instruction));
     size_t pos = instStr.find_first_of(" \t");
     String opcode = instStr.substr(0, pos);
@@ -326,10 +324,10 @@ bool trydisasm(const unsigned char* buffer, duint addr, DISASM_INSTR* instr, dui
     instr->type = instr_normal;
     instr->arg[0].type = arg_normal;
     instr->arg[0].value = decodesimpledata(buffer, type);
-    strcpy_s(instr->arg[0].mnemonic, GetDataTypeString((void*)buffer, size, type).c_str());
+    strncpy_s(instr->arg[0].mnemonic, GetDataTypeString((void*)buffer, size, type).c_str(), _TRUNCATE);
     instr->instr_size = int(size);
     String str = GetDataInstString((void*)buffer, MAX_DISASM_BUFFER, type);
-    strcpy_s(instr->instruction, str.c_str());
+    strncpy_s(instr->instruction, str.c_str(), _TRUNCATE);
     return true;
 }
 
@@ -343,7 +341,7 @@ bool trydisasmfast(const unsigned char* data, duint addr, BASIC_INSTRUCTION_INFO
     basicinfo->type = TYPE_VALUE;
     basicinfo->size = int(size);
     String str = GetDataInstString((void*)data, MAX_DISASM_BUFFER, type);
-    strcpy_s(basicinfo->instruction, str.c_str());
+    strncpy_s(basicinfo->instruction, str.c_str(), _TRUNCATE);
     basicinfo->value.size = VALUE_SIZE(size);
     basicinfo->value.value = decodesimpledata(data, type);
     return true;

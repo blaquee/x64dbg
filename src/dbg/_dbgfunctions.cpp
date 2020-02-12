@@ -383,6 +383,10 @@ static int SymAutoComplete(const char* Search, char** Buffer, int MaxSymbols)
         mods.push_back(info.base);
     });
 
+    std::unordered_set<std::string> visited;
+
+    static const bool caseSensitiveAutoComplete = settingboolget("Gui", "CaseSensitiveAutoComplete");
+
     int count = 0;
     std::string prefix(Search);
     for(duint base : mods)
@@ -392,17 +396,60 @@ static int SymAutoComplete(const char* Search, char** Buffer, int MaxSymbols)
 
         SHARED_ACQUIRE(LockModules);
         auto modInfo = ModInfoFromAddr(base);
-        if(modInfo && modInfo->symbols->isOpen())
+        if(!modInfo)
+            continue;
+
+        auto addName = [Buffer, MaxSymbols, &visited, &count](const std::string & name)
         {
-            modInfo->symbols->findSymbolsByPrefix(prefix, [Buffer, MaxSymbols, &count](const SymbolInfo & symInfo)
+            if(visited.count(name))
+                return true;
+            visited.insert(name);
+            Buffer[count] = (char*)BridgeAlloc(name.size() + 1);
+            memcpy(Buffer[count], name.c_str(), name.size() + 1);
+            return ++count < MaxSymbols;
+        };
+
+        NameIndex::findByPrefix(modInfo->exportsByName, prefix, [modInfo, &addName](const NameIndex & index)
+        {
+            return addName(modInfo->exports[index.index].name);
+        }, caseSensitiveAutoComplete);
+
+        if(count == MaxSymbols)
+            break;
+
+        if(modInfo->symbols->isOpen())
+        {
+            modInfo->symbols->findSymbolsByPrefix(prefix, [&addName](const SymbolInfo & symInfo)
             {
-                Buffer[count] = (char*)BridgeAlloc(symInfo.decoratedName.size() + 1);
-                memcpy(Buffer[count], symInfo.decoratedName.c_str(), symInfo.decoratedName.size() + 1);
-                return ++count < MaxSymbols;
-            }, true); //TODO: support case insensitive in the GUI
+                return addName(symInfo.decoratedName);
+            }, caseSensitiveAutoComplete);
         }
     }
+
+    std::stable_sort(Buffer, Buffer + count, [](const char* a, const char* b)
+    {
+        return (caseSensitiveAutoComplete ? strcmp : StringUtils::hackicmp)(a, b) < 0;
+    });
+
     return count;
+}
+
+MODULESYMBOLSTATUS _modsymbolstatus(duint base)
+{
+    SHARED_ACQUIRE(LockModules);
+    auto modInfo = ModInfoFromAddr(base);
+    if(!modInfo)
+        return MODSYMUNLOADED;
+    bool isOpen = modInfo->symbols->isOpen();
+    bool isLoading = modInfo->symbols->isLoading();
+    if(isOpen && !isLoading)
+        return MODSYMLOADED;
+    else if(isOpen && isLoading)
+        return MODSYMLOADING;
+    else if(!isOpen && symbolDownloadingBase == base)
+        return MODSYMLOADING;
+    else
+        return MODSYMUNLOADED;
 }
 
 static void _refreshmodulelist()
@@ -443,7 +490,7 @@ void dbgfunctionsinit()
     _dbgfunctions.GetPageRights = MemGetPageRights;
     _dbgfunctions.SetPageRights = MemSetPageRights;
     _dbgfunctions.PageRightsToString = MemPageRightsToString;
-    _dbgfunctions.IsProcessElevated = IsProcessElevated;
+    _dbgfunctions.IsProcessElevated = BridgeIsProcessElevated;
     _dbgfunctions.GetCmdline = _getcmdline;
     _dbgfunctions.SetCmdline = _setcmdline;
     _dbgfunctions.FileOffsetToVa = valfileoffsettova;
@@ -484,4 +531,5 @@ void dbgfunctionsinit()
     _dbgfunctions.SymAutoComplete = SymAutoComplete;
     _dbgfunctions.RefreshModuleList = _refreshmodulelist;
     _dbgfunctions.GetAddrFromLineEx = _getaddrfromlineex;
+    _dbgfunctions.ModSymbolStatus = _modsymbolstatus;
 }

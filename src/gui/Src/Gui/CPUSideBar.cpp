@@ -49,6 +49,10 @@ void CPUSideBar::updateColors()
     mUnconditionalJumpLineFalseColor = ConfigColor("SideBarUnconditionalJumpLineFalseColor");
     mConditionalJumpLineTrueColor = ConfigColor("SideBarConditionalJumpLineTrueColor");
     mUnconditionalJumpLineTrueColor = ConfigColor("SideBarUnconditionalJumpLineTrueColor");
+    mConditionalJumpLineFalseBackwardsColor = ConfigColor("SideBarConditionalJumpLineFalseBackwardsColor");
+    mUnconditionalJumpLineFalseBackwardsColor = ConfigColor("SideBarUnconditionalJumpLineFalseBackwardsColor");
+    mConditionalJumpLineTrueBackwardsColor = ConfigColor("SideBarConditionalJumpLineTrueBackwardsColor");
+    mUnconditionalJumpLineTrueBackwardsColor = ConfigColor("SideBarUnconditionalJumpLineTrueBackwardsColor");
 
     mBulletBreakpointColor = ConfigColor("SideBarBulletBreakpointColor");
     mBulletBookmarkColor = ConfigColor("SideBarBulletBookmarkColor");
@@ -63,6 +67,8 @@ void CPUSideBar::updateColors()
 
     mUnconditionalPen = QPen(mUnconditionalJumpLineFalseColor, 1, Qt::SolidLine);
     mConditionalPen = QPen(mConditionalJumpLineFalseColor, 1, Qt::DashLine);
+    mUnconditionalBackwardsPen = QPen(mUnconditionalJumpLineFalseBackwardsColor, 1, Qt::SolidLine);
+    mConditionalBackwardsPen = QPen(mConditionalJumpLineFalseBackwardsColor, 1, Qt::DashLine);
 }
 
 void CPUSideBar::updateFonts()
@@ -121,6 +127,9 @@ void CPUSideBar::setSelection(dsint selVA)
 
 bool CPUSideBar::isJump(int i) const
 {
+    if(i < 0 || i >= mInstrBuffer->size())
+        return false;
+
     const Instruction_t & instr = mInstrBuffer->at(i);
     Instruction_t::BranchType branchType = instr.branchType;
     if(branchType == Instruction_t::Unconditional || branchType == Instruction_t::Conditional)
@@ -217,6 +226,7 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
     {
         if(line >= mInstrBuffer->size()) //at the end of the page it will crash otherwise
             break;
+
         const Instruction_t & instr = mInstrBuffer->at(line);
         duint instrVA = instr.rva + mDisas->getBase();
         duint instrVAEnd = instrVA + instr.length;
@@ -441,6 +451,7 @@ void CPUSideBar::mouseMoveEvent(QMouseEvent* event)
     if(!DbgIsDebugging() || !mInstrBuffer->size())
     {
         QAbstractScrollArea::mouseMoveEvent(event);
+        QToolTip::hideText();
         setCursor(QCursor(Qt::ArrowCursor));
         return;
     }
@@ -450,13 +461,19 @@ void CPUSideBar::mouseMoveEvent(QMouseEvent* event)
     const int width = viewport()->width();
 
     const int mLine = mousePos.y() / fontHeight;
+
+    const bool lineInBounds = mLine > 0 && mLine < mInstrBuffer->size();
+
     const int mBulletX = width - mBulletXOffset;
     const int mBulletY = mLine * fontHeight + mBulletYOffset;
 
     const int mouseBulletXOffset = abs(mBulletX - mousePos.x());
     const int mouseBulletYOffset = abs(mBulletY - mousePos.y());
+
     // calculate virtual address of clicked line
-    duint wVA = mInstrBuffer->at(mLine).rva + mDisas->getBase();
+    duint wVA = 0;
+    if(lineInBounds)
+        wVA = mInstrBuffer->at(mLine).rva + mDisas->getBase();
 
     // check if mouse is on a code folding box
     if(mousePos.x() > width - fontHeight - mBulletXOffset - mBulletRadius && mousePos.x() < width - mBulletXOffset - mBulletRadius)
@@ -465,21 +482,19 @@ void CPUSideBar::mouseMoveEvent(QMouseEvent* event)
         {
             if(mCodeFoldingManager.isFolded(wVA))
             {
-                QToolTip::showText(globalMousePos, tr("Click to unfold.") + tr("Right click to delete."));
+                QToolTip::showText(globalMousePos, tr("Click to unfold, right click to delete."));
             }
             else
             {
                 if(mCodeFoldingManager.isFoldStart(wVA))
-                    QToolTip::showText(globalMousePos, tr("Click to fold.") + tr("Right click to delete."));
+                    QToolTip::showText(globalMousePos, tr("Click to fold, right click to delete."));
                 else
                     QToolTip::showText(globalMousePos, tr("Click to fold."));
             }
         }
     }
-
     // if (mouseCursor not on a bullet) or (mLine not in bounds)
-    else if((mouseBulletXOffset > mBulletRadius ||  mouseBulletYOffset > mBulletRadius) ||
-            (mLine < 0 || mLine >= mInstrBuffer->size()))
+    else if((mouseBulletXOffset > mBulletRadius ||  mouseBulletYOffset > mBulletRadius) || !lineInBounds)
     {
         QToolTip::hideText();
         setCursor(QCursor(Qt::ArrowCursor));
@@ -505,13 +520,28 @@ void CPUSideBar::mouseMoveEvent(QMouseEvent* event)
 void CPUSideBar::drawJump(QPainter* painter, int startLine, int endLine, int jumpoffset, bool conditional, bool isexecute, bool isactive)
 {
     painter->save();
-    if(conditional)
-        painter->setPen(mConditionalPen);
-    else
-        painter->setPen(mUnconditionalPen); //JMP
 
     // Pixel adjustment to make drawing lines even
     int pixel_y_offs = 0;
+
+    int y_start =  fontHeight * (1 + startLine) - 0.5 * fontHeight - pixel_y_offs;
+    int y_end =  fontHeight * (1 + endLine) - 0.5 * fontHeight;
+    int y_diff = y_end >= y_start ? 1 : -1;
+
+    if(conditional)
+    {
+        if(y_diff > 0)
+            painter->setPen(mConditionalPen);
+        else
+            painter->setPen(mConditionalBackwardsPen);
+    }
+    else //JMP
+    {
+        if(y_diff > 0)
+            painter->setPen(mUnconditionalPen);
+        else
+            painter->setPen(mUnconditionalBackwardsPen);
+    }
 
     if(isactive) //selected
     {
@@ -527,9 +557,19 @@ void CPUSideBar::drawJump(QPainter* painter, int startLine, int endLine, int jum
         if(isexecute)
         {
             if(conditional)
-                activePen.setColor(mConditionalJumpLineTrueColor);
+            {
+                if(y_diff > 0)
+                    activePen.setColor(mConditionalJumpLineTrueColor);
+                else
+                    activePen.setColor(mConditionalJumpLineTrueBackwardsColor);
+            }
             else
-                activePen.setColor(mUnconditionalJumpLineTrueColor);
+            {
+                if(y_diff > 0)
+                    activePen.setColor(mUnconditionalJumpLineTrueColor);
+                else
+                    activePen.setColor(mUnconditionalJumpLineTrueBackwardsColor);
+            }
         }
 
         // Update the painter itself with the new pen style
@@ -543,8 +583,6 @@ void CPUSideBar::drawJump(QPainter* painter, int startLine, int endLine, int jum
     const int JumpPadding = 11;
     int x = viewportWidth - jumpoffset * JumpPadding - 15 - fontHeight;
     int x_right = viewportWidth - 12;
-    int y_start =  fontHeight * (1 + startLine) - 0.5 * fontHeight - pixel_y_offs;
-    int y_end =  fontHeight * (1 + endLine) - 0.5 * fontHeight;
 
     // special handling of self-jumping
     if(startLine == endLine)

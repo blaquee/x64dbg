@@ -200,10 +200,17 @@ public:
         Narrow,
     };
 
+    struct ClickPosition
+    {
+        QPoint pos = QPoint(0, 0);
+        bool inBlock = false;
+    };
+
     DisassemblerGraphView(QWidget* parent = nullptr);
     ~DisassemblerGraphView();
+    void resetGraph();
     void initFont();
-    void adjustSize(int width, int height);
+    void adjustSize(int viewportWidth, int viewportHeight, QPoint mousePosition = QPoint(0, 0), bool fitToWindow = false);
     void resizeEvent(QResizeEvent* event);
     duint get_cursor_pos();
     void set_cursor_pos(duint addr);
@@ -228,7 +235,6 @@ public:
     void computeGraphLayout(DisassemblerBlock & block);
     void setupContextMenu();
     void keyPressEvent(QKeyEvent* event);
-
     template<typename T>
     using Matrix = std::vector<std::vector<T>>;
     using EdgesVector = Matrix<std::vector<bool>>;
@@ -242,11 +248,15 @@ public:
     bool navigate(duint addr);
     void fontChanged();
     void setGraphLayout(LayoutType layout);
+    void paintZoom(QPainter & p, QRect & viewportRect, int xofs, int yofs);
+    void wheelEvent(QWheelEvent* event);
+    void showEvent(QShowEvent* event);
+    void zoomIn(QPoint mousePosition);
+    void zoomOut(QPoint mousePosition);
+    void showContextMenu(QMouseEvent* event);
+    duint zoomActionHelper();
 
     VaHistory mHistory;
-
-signals:
-    void displaySnowmanWidget();
 
 public slots:
     void loadGraphSlot(BridgeCFGraphList* graph, duint addr);
@@ -273,9 +283,23 @@ public slots:
     void setCommentSlot();
     void setLabelSlot();
     void xrefSlot();
-    void decompileSlot();
+    void fitToWindowSlot();
+    void zoomToCursorSlot();
+    void getCurrentGraphSlot(BridgeCFGraphList* graphList);
+    void dbgStateChangedSlot(DBGSTATE state);
 
 private:
+    bool graphZoomMode;
+    qreal zoomLevel;
+    qreal zoomLevelOld;
+    qreal zoomMinimum;
+    qreal zoomMaximum;
+    qreal zoomOverviewValue;
+    qreal zoomStep;
+    //qreal zoomScrollThreshold;
+    int zoomDirection;
+    int zoomBoost;
+    ClickPosition lastRightClickPosition;
     QString status;
     Analysis analysis;
     duint function;
@@ -295,6 +319,7 @@ private:
     int scroll_base_y;
     bool scroll_mode;
     bool ready;
+    bool viewportReady;
     int* desired_pos;
     std::unordered_map<duint, DisassemblerBlock> blocks;
     HighlightToken* highlight_token;
@@ -302,6 +327,7 @@ private:
     std::vector<int> row_edge_y;
     CachedFontMetrics* mFontMetrics;
     MenuBuilder* mMenuBuilder;
+    QMenu* mPluginMenu;
     bool drawOverview;
     bool onlySummary;
     bool syncOrigin;
@@ -317,6 +343,8 @@ private:
     QAction* mToggleOverview;
     QAction* mToggleSummary;
     QAction* mToggleSyncOrigin;
+    QAction* mFitToWindow;
+    QAction* mZoomToCursor;
 
     QColor disassemblyBackgroundColor;
     QColor disassemblySelectionColor;
@@ -334,12 +362,14 @@ private:
     QColor mCommentBackgroundColor;
     QColor mLabelColor;
     QColor mLabelBackgroundColor;
-    QColor graphNodeColor;
     QColor mAddressColor;
     QColor mAddressBackgroundColor;
     QColor mCipColor;
     QColor mBreakpointColor;
     QColor mDisabledBreakpointColor;
+    QColor graphNodeColor;
+    QColor graphNodeBackgroundColor;
+    QColor graphCurrentShadowColor;
 
     BridgeCFGraph currentGraph;
     std::unordered_map<duint, duint> currentBlockMap;
@@ -347,7 +377,7 @@ private:
     GotoDialog* mGoto;
     XrefBrowseDialog* mXrefDlg;
 
-    void addReferenceAction(QMenu* menu, duint addr);
+    void addReferenceAction(QMenu* menu, duint addr, const QString & description);
 };
 
 #endif // DISASSEMBLERGRAPHVIEW_H
