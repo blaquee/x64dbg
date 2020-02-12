@@ -81,9 +81,13 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultColors.insert("SideBarCipLabelBackgroundColor", QColor("#4040FF"));
     defaultColors.insert("SideBarBackgroundColor", QColor("#FFF8F0"));
     defaultColors.insert("SideBarConditionalJumpLineTrueColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarConditionalJumpLineFalseColor", QColor("#808080"));
+    defaultColors.insert("SideBarConditionalJumpLineFalseColor", QColor("#00BBFF"));
     defaultColors.insert("SideBarUnconditionalJumpLineTrueColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarUnconditionalJumpLineFalseColor", QColor("#808080"));
+    defaultColors.insert("SideBarUnconditionalJumpLineFalseColor", QColor("#00BBFF"));
+    defaultColors.insert("SideBarConditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarConditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
+    defaultColors.insert("SideBarUnconditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarUnconditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
     defaultColors.insert("SideBarBulletColor", QColor("#808080"));
     defaultColors.insert("SideBarBulletBreakpointColor", QColor("#FF0000"));
     defaultColors.insert("SideBarBulletDisabledBreakpointColor", QColor("#00AA00"));
@@ -240,8 +244,10 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultColors.insert("BreakpointSummaryParenColor", Qt::red);
     defaultColors.insert("BreakpointSummaryKeywordColor", QColor("#8B671F"));
     defaultColors.insert("BreakpointSummaryStringColor", QColor("#008000"));
-
     defaultColors.insert("PatchRelocatedByteHighlightColor", QColor("#0000DD"));
+    defaultColors.insert("SymbolUnloadedTextColor", QColor("#000000"));
+    defaultColors.insert("SymbolLoadingTextColor", QColor("#8B671F"));
+    defaultColors.insert("SymbolLoadedTextColor", QColor("#008000"));
 
     //bool settings
     QMap<QString, bool> disassemblyBool;
@@ -273,11 +279,12 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     guiBool.insert("NoCloseDialog", false);
     guiBool.insert("PidInHex", true);
     guiBool.insert("SidebarWatchLabels", true);
-    guiBool.insert("LoadSaveTabOrder", false);
+    guiBool.insert("LoadSaveTabOrder", true);
     guiBool.insert("ShowGraphRva", false);
     guiBool.insert("GraphZoomMode", false);
     guiBool.insert("ShowExitConfirmation", true);
     guiBool.insert("DisableAutoComplete", false);
+    guiBool.insert("CaseSensitiveAutoComplete", false);
     //Named menu settings
     insertMenuBuilderBools(&guiBool, "CPUDisassembly", 50); //CPUDisassembly
     insertMenuBuilderBools(&guiBool, "CPUDump", 50); //CPUDump
@@ -285,7 +292,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     insertMenuBuilderBools(&guiBool, "CallStackView", 50); //CallStackView
     insertMenuBuilderBools(&guiBool, "ThreadView", 50); //Thread
     insertMenuBuilderBools(&guiBool, "CPUStack", 50); //Stack
-    insertMenuBuilderBools(&guiBool, "SourceView", 10); //Source
+    insertMenuBuilderBools(&guiBool, "SourceView", 50); //Source
     insertMenuBuilderBools(&guiBool, "DisassemblerGraphView", 50); //Graph
     insertMenuBuilderBools(&guiBool, "XrefBrowseDialog", 10); //XrefBrowseDialog
     insertMenuBuilderBools(&guiBool, "StructWidget", 8); //StructWidget
@@ -314,8 +321,9 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "TcpConnection", 3);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Privilege", 2);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "LocalVarsView", 3);
-    AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Module", 4);
+    AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Module", 5);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Symbol", 5);
+    AbstractTableView::setupColumnConfigDefaultValue(guiUint, "SourceView", 4);
     guiUint.insert("SIMDRegistersDisplayMode", 0);
     addWindowPosConfig(guiUint, "AssembleDialog");
     addWindowPosConfig(guiUint, "AttachDialog");
@@ -323,7 +331,6 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     addWindowPosConfig(guiUint, "EditBreakpointDialog");
     addWindowPosConfig(guiUint, "BrowseDialog");
     addWindowPosConfig(guiUint, "FavouriteTools");
-    addWindowPosConfig(guiUint, "EntropyDialog");
     addWindowPosConfig(guiUint, "HexEditDialog");
     addWindowPosConfig(guiUint, "WordEditDialog");
     defaultUints.insert("Gui", guiUint);
@@ -352,7 +359,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     tabOrderUint.insert("SourceTab", curTab++);
     tabOrderUint.insert("ReferencesTab", curTab++);
     tabOrderUint.insert("ThreadsTab", curTab++);
-    tabOrderUint.insert("SnowmanTab", curTab++);
+    curTab++; // removed SnowmanTab
     tabOrderUint.insert("HandlesTab", curTab++);
     tabOrderUint.insert("TraceTab", curTab++);
     defaultUints.insert("TabOrder", tabOrderUint);
@@ -396,7 +403,6 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("ViewBookmarks", Shortcut({tr("View"), tr("Bookmarks")}, "Ctrl+Alt+B", true));
     defaultShortcuts.insert("ViewFunctions", Shortcut({tr("View"), tr("Functions")}, "Ctrl+Alt+F", true));
     defaultShortcuts.insert("ViewVariables", Shortcut({tr("View"), tr("Variables")}, "", true));
-    defaultShortcuts.insert("ViewSnowman", Shortcut({tr("View"), tr("Snowman")}, "", true));
     defaultShortcuts.insert("ViewHandles", Shortcut({tr("View"), tr("Handles")}, "", true));
     defaultShortcuts.insert("ViewGraph", Shortcut({tr("View"), tr("Graph")}, "Alt+G", true));
     defaultShortcuts.insert("ViewPreviousTab", Shortcut({tr("View"), tr("Previous Tab")}, "Alt+Left"));
@@ -482,7 +488,6 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("ActionToggleFunction", Shortcut({tr("Actions"), tr("Toggle Function")}, "Shift+F"));
     defaultShortcuts.insert("ActionToggleArgument", Shortcut({tr("Actions"), tr("Toggle Argument")}, "Shift+A"));
     defaultShortcuts.insert("ActionAssemble", Shortcut({tr("Actions"), tr("Assemble")}, "Space"));
-    defaultShortcuts.insert("ActionYara", Shortcut({tr("Actions"), tr("Yara")}, "Ctrl+Y"));
     defaultShortcuts.insert("ActionSetNewOriginHere", Shortcut({tr("Actions"), tr("Set New Origin Here")}, "Ctrl+*"));
     defaultShortcuts.insert("ActionGotoOrigin", Shortcut({tr("Actions"), tr("Goto Origin")}, "*"));
     defaultShortcuts.insert("ActionGotoPrevious", Shortcut({tr("Actions"), tr("Goto Previous")}, "-"));
@@ -507,14 +512,11 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("ActionToggleDestinationPreview", Shortcut({tr("Actions"), tr("Enable/Disable Branch Destination Preview")}, "P"));
     defaultShortcuts.insert("ActionFind", Shortcut({tr("Actions"), tr("Find")}, "Ctrl+F"));
     defaultShortcuts.insert("ActionFindInModule", Shortcut({tr("Actions"), tr("Find in Current Module")}, "Ctrl+Shift+F"));
-    defaultShortcuts.insert("ActionDecompileFunction", Shortcut({tr("Actions"), tr("Decompile Function")}, "F5"));
-    defaultShortcuts.insert("ActionDecompileSelection", Shortcut({tr("Actions"), tr("Decompile Selection")}, "Shift+F5"));
     defaultShortcuts.insert("ActionEditBreakpoint", Shortcut({tr("Actions"), tr("Edit breakpoint")}, ""));
     defaultShortcuts.insert("ActionToggleLogging", Shortcut({tr("Actions"), tr("Enable/Disable Logging")}, ""));
     defaultShortcuts.insert("ActionAllocateMemory", Shortcut({tr("Actions"), tr("Allocate Memory")}, ""));
     defaultShortcuts.insert("ActionFreeMemory", Shortcut({tr("Actions"), tr("Free Memory")}, ""));
     defaultShortcuts.insert("ActionSyncWithExpression", Shortcut({tr("Actions"), tr("Sync With Expression")}, ""));
-    defaultShortcuts.insert("ActionEntropy", Shortcut({tr("Actions"), tr("Entropy")}, ""));
     defaultShortcuts.insert("ActionCopyAllRegisters", Shortcut({tr("Actions"), tr("Copy All Registers")}, ""));
     defaultShortcuts.insert("ActionMarkAsUser", Shortcut({tr("Actions"), tr("Mark As User Module")}, ""));
     defaultShortcuts.insert("ActionMarkAsSystem", Shortcut({tr("Actions"), tr("Mark As System Module")}, ""));
@@ -567,6 +569,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("ActionCopyAddress", Shortcut({tr("Actions"), tr("Copy Address")}, "Alt+INS"));
     defaultShortcuts.insert("ActionCopyRva", Shortcut({tr("Actions"), tr("Copy RVA")}, ""));
     defaultShortcuts.insert("ActionCopySymbol", Shortcut({tr("Actions"), tr("Copy Symbol")}, "Ctrl+S"));
+    defaultShortcuts.insert("ActionCopyLine", Shortcut({tr("Actions"), tr("Copy Line")}, ""));
     defaultShortcuts.insert("ActionLoadScript", Shortcut({tr("Actions"), tr("Load Script")}, "Ctrl+O"));
     defaultShortcuts.insert("ActionReloadScript", Shortcut({tr("Actions"), tr("Reload Script")}, "Ctrl+R"));
     defaultShortcuts.insert("ActionUnloadScript", Shortcut({tr("Actions"), tr("Unload Script")}, "Ctrl+U"));
@@ -586,7 +589,6 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("ActionGraphToggleOverview", Shortcut({tr("Actions"), tr("Graph"), tr("Toggle overview")}, "O"));
     defaultShortcuts.insert("ActionGraphToggleSummary", Shortcut({tr("Actions"), tr("Graph"), tr("Toggle summary")}, "U"));
     defaultShortcuts.insert("ActionGraphSyncOrigin", Shortcut({tr("Actions"), tr("Graph"), tr("Toggle sync with origin")}, "S"));
-    defaultShortcuts.insert("ActionGraphDecompile", Shortcut({tr("Actions"), tr("Graph"), tr("Decompile")}, "Tab"));
     defaultShortcuts.insert("ActionIncrementx87Stack", Shortcut({tr("Actions"), tr("Increment x87 Stack")}));
     defaultShortcuts.insert("ActionDecrementx87Stack", Shortcut({tr("Actions"), tr("Decrement x87 Stack")}));
     defaultShortcuts.insert("ActionPush", Shortcut({tr("Actions"), tr("Push")}));
@@ -777,7 +779,7 @@ void Configuration::readShortcuts()
 
     while(it != Shortcuts.end())
     {
-        const QString id = it.key();
+        const QString & id = it.key();
         QString key = shortcutFromConfig(id);
         if(key != "")
         {
@@ -806,7 +808,7 @@ void Configuration::writeShortcuts()
     emit shortcutsUpdated();
 }
 
-const QColor Configuration::getColor(const QString id) const
+const QColor Configuration::getColor(const QString & id) const
 {
     if(Colors.contains(id))
         return Colors.constFind(id).value();
@@ -820,7 +822,7 @@ const QColor Configuration::getColor(const QString id) const
     return Qt::black;
 }
 
-const bool Configuration::getBool(const QString category, const QString id) const
+const bool Configuration::getBool(const QString & category, const QString & id) const
 {
     if(Bools.contains(category))
     {
@@ -845,7 +847,7 @@ const bool Configuration::getBool(const QString category, const QString id) cons
     return false;
 }
 
-void Configuration::setBool(const QString category, const QString id, const bool b)
+void Configuration::setBool(const QString & category, const QString & id, const bool b)
 {
     if(Bools.contains(category))
     {
@@ -872,7 +874,7 @@ void Configuration::setBool(const QString category, const QString id, const bool
         noMoreMsgbox = true;
 }
 
-const duint Configuration::getUint(const QString category, const QString id) const
+const duint Configuration::getUint(const QString & category, const QString & id) const
 {
     if(Uints.contains(category))
     {
@@ -897,7 +899,7 @@ const duint Configuration::getUint(const QString category, const QString id) con
     return 0;
 }
 
-void Configuration::setUint(const QString category, const QString id, const duint i)
+void Configuration::setUint(const QString & category, const QString & id, const duint i)
 {
     if(Uints.contains(category))
     {
@@ -924,7 +926,7 @@ void Configuration::setUint(const QString category, const QString id, const duin
         noMoreMsgbox = true;
 }
 
-const QFont Configuration::getFont(const QString id) const
+const QFont Configuration::getFont(const QString & id) const
 {
     if(Fonts.contains(id))
         return Fonts.constFind(id).value();
@@ -941,7 +943,7 @@ const QFont Configuration::getFont(const QString id) const
     return ret;
 }
 
-const Configuration::Shortcut Configuration::getShortcut(const QString key_id) const
+const Configuration::Shortcut Configuration::getShortcut(const QString & key_id) const
 {
     if(Shortcuts.contains(key_id))
         return Shortcuts.constFind(key_id).value();
@@ -956,7 +958,7 @@ const Configuration::Shortcut Configuration::getShortcut(const QString key_id) c
     return Shortcut();
 }
 
-void Configuration::setShortcut(const QString key_id, const QKeySequence key_sequence)
+void Configuration::setShortcut(const QString & key_id, const QKeySequence key_sequence)
 {
     if(Shortcuts.contains(key_id))
     {
@@ -972,13 +974,13 @@ void Configuration::setShortcut(const QString key_id, const QKeySequence key_seq
         noMoreMsgbox = true;
 }
 
-void Configuration::setPluginShortcut(const QString key_id, QString description, QString defaultShortcut, bool global)
+void Configuration::setPluginShortcut(const QString & key_id, QString description, QString defaultShortcut, bool global)
 {
     defaultShortcuts[key_id] = Shortcut(description, defaultShortcut, global);
     readShortcuts();
 }
 
-QColor Configuration::colorFromConfig(const QString id)
+QColor Configuration::colorFromConfig(const QString & id)
 {
     char setting[MAX_SETTING_SIZE] = "";
     if(!BridgeSettingGet("Colors", id.toUtf8().constData(), setting))
@@ -1007,7 +1009,7 @@ QColor Configuration::colorFromConfig(const QString id)
     return color;
 }
 
-bool Configuration::colorToConfig(const QString id, const QColor color)
+bool Configuration::colorToConfig(const QString & id, const QColor color)
 {
     QString colorName = color.name().toUpper();
     if(!color.alpha())
@@ -1015,7 +1017,7 @@ bool Configuration::colorToConfig(const QString id, const QColor color)
     return BridgeSettingSet("Colors", id.toUtf8().constData(), colorName.toUtf8().constData());
 }
 
-bool Configuration::boolFromConfig(const QString category, const QString id)
+bool Configuration::boolFromConfig(const QString & category, const QString & id)
 {
     duint setting;
     if(!BridgeSettingGetUint(category.toUtf8().constData(), id.toUtf8().constData(), &setting))
@@ -1031,12 +1033,12 @@ bool Configuration::boolFromConfig(const QString category, const QString id)
     return (setting != 0);
 }
 
-bool Configuration::boolToConfig(const QString category, const QString id, const bool bBool)
+bool Configuration::boolToConfig(const QString & category, const QString & id, const bool bBool)
 {
     return BridgeSettingSetUint(category.toUtf8().constData(), id.toUtf8().constData(), bBool);
 }
 
-duint Configuration::uintFromConfig(const QString category, const QString id)
+duint Configuration::uintFromConfig(const QString & category, const QString & id)
 {
     duint setting;
     if(!BridgeSettingGetUint(category.toUtf8().constData(), id.toUtf8().constData(), &setting))
@@ -1052,12 +1054,12 @@ duint Configuration::uintFromConfig(const QString category, const QString id)
     return setting;
 }
 
-bool Configuration::uintToConfig(const QString category, const QString id, duint i)
+bool Configuration::uintToConfig(const QString & category, const QString & id, duint i)
 {
     return BridgeSettingSetUint(category.toUtf8().constData(), id.toUtf8().constData(), i);
 }
 
-QFont Configuration::fontFromConfig(const QString id)
+QFont Configuration::fontFromConfig(const QString & id)
 {
     char setting[MAX_SETTING_SIZE] = "";
     if(!BridgeSettingGet("Fonts", id.toUtf8().constData(), setting))
@@ -1094,12 +1096,12 @@ QFont Configuration::fontFromConfig(const QString id)
     return font;
 }
 
-bool Configuration::fontToConfig(const QString id, const QFont font)
+bool Configuration::fontToConfig(const QString & id, const QFont font)
 {
     return BridgeSettingSet("Fonts", id.toUtf8().constData(), font.toString().toUtf8().constData());
 }
 
-QString Configuration::shortcutFromConfig(const QString id)
+QString Configuration::shortcutFromConfig(const QString & id)
 {
     QString _id = QString("%1").arg(id);
     char setting[MAX_SETTING_SIZE] = "";
@@ -1110,7 +1112,7 @@ QString Configuration::shortcutFromConfig(const QString id)
     return QString();
 }
 
-bool Configuration::shortcutToConfig(const QString id, const QKeySequence shortcut)
+bool Configuration::shortcutToConfig(const QString & id, const QKeySequence shortcut)
 {
     QString _id = QString("%1").arg(id);
     QString _key = "";

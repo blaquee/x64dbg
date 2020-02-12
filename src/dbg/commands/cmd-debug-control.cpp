@@ -43,7 +43,6 @@ bool cbDebugRunInternal(int argc, char* argv[])
     // Don't "run" twice if the program is already running
     if(dbgisrunning())
         return false;
-    dbgsetispausedbyuser(false);
     GuiSetDebugStateAsync(running);
     unlock(WAITID_RUN);
     PLUG_CB_RESUMEDEBUG callbackInfo;
@@ -161,6 +160,7 @@ bool cbDebugStop(int argc, char* argv[])
     //history
     HistoryClear();
     DWORD BeginTick = GetTickCount();
+    bool shownWarning = false;
 
     while(true)
     {
@@ -174,15 +174,24 @@ bool cbDebugStop(int argc, char* argv[])
         {
             unlock(WAITID_RUN);
             DWORD CurrentTick = GetTickCount();
-            if(CurrentTick - BeginTick > 10000)
+            DWORD TimeElapsed = CurrentTick - BeginTick;
+            if(TimeElapsed >= 10000)
             {
-                dputs(QT_TRANSLATE_NOOP("DBG", "The debuggee does not stop after 10 seconds. The debugger state may be corrupted."));
-                DbSave(DbLoadSaveType::All);
-                TerminateThread(hDebugLoopThreadCopy, 1); // TODO: this will lose state and cause possible corruption if a critical section is still owned
-                CloseHandle(hDebugLoopThreadCopy);
-                return false;
+                if(!shownWarning)
+                {
+                    shownWarning = true;
+                    dputs(QT_TRANSLATE_NOOP("DBG", "Finalizing the debugger thread took more than 10 seconds. This can happen if you are loading large symbol files or saving a large database."));
+                }
+                if(IsFileBeingDebugged() || TimeElapsed >= 100000)
+                {
+                    dputs(QT_TRANSLATE_NOOP("DBG", "The debuggee did not stop after 10 seconds of requesting termination. The debugger state may be corrupted. It is recommended to restart x64dbg."));
+                    DbSave(DbLoadSaveType::All);
+                    TerminateThread(hDebugLoopThreadCopy, 1); // TODO: this will lose state and cause possible corruption if a critical section is still owned
+                    CloseHandle(hDebugLoopThreadCopy);
+                    return false;
+                }
             }
-            if(CurrentTick - BeginTick >= 300)
+            if(TimeElapsed >= 300)
                 TerminateProcess(fdProcessInfo->hProcess, -1);
         }
         break;
@@ -391,7 +400,7 @@ bool cbDebugStepOver(int argc, char* argv[])
         return true;
     if(skipInt3Stepping(1, argv) && !--steprepeat)
         return true;
-    StepOver((void*)cbStep);
+    StepOverWrapper((void*)cbStep);
     // History
     HistoryClear();
     dbgsetsteprepeat(false, steprepeat);
@@ -419,7 +428,7 @@ bool cbDebugStepOut(int argc, char* argv[])
         return true;
     HistoryClear();
     mRtrPreviousCSP = GetContextDataEx(hActiveThread, UE_CSP);
-    StepOver((void*)cbRtrStep);
+    StepOverWrapper((void*)cbRtrStep);
     dbgsetsteprepeat(false, steprepeat);
     return cbDebugRunInternal(1, argv);
 }

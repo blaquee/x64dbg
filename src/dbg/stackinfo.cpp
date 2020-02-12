@@ -153,6 +153,27 @@ static BOOL CALLBACK StackReadProcessMemoryProc64(HANDLE hProcess, DWORD64 lpBas
     return false;
 }
 
+static PVOID CALLBACK StackSymFunctionTableAccess64(HANDLE hProcess, DWORD64 AddrBase)
+{
+#ifdef _WIN64
+    // https://github.com/dotnet/coreclr/blob/master/src/unwinder/amd64/dbs_stack_x64.cpp
+    MODINFO* info = ModInfoFromAddr(AddrBase);
+    if(!info)
+        return nullptr;
+
+    DWORD rva = DWORD(AddrBase - info->base);
+    auto found = std::lower_bound(info->runtimeFunctions.begin(), info->runtimeFunctions.end(), rva, [](const RUNTIME_FUNCTION & a, const DWORD & rva)
+    {
+        return a.EndAddress <= rva;
+    });
+
+    if(found != info->runtimeFunctions.end() && rva >= found->BeginAddress)
+        return &found->BeginAddress;
+#endif // _WIN64
+
+    return SymFunctionTableAccess64(hProcess, AddrBase);
+}
+
 static DWORD64 CALLBACK StackGetModuleBaseProc64(HANDLE hProcess, DWORD64 Address)
 {
     return (DWORD64)ModBaseFromAddr((duint)Address);
@@ -308,7 +329,7 @@ void stackgetcallstack(duint csp, std::vector<CALLSTACKENTRY> & callstackVector,
                         &frame,
                         &context,
                         StackReadProcessMemoryProc64,
-                        SymFunctionTableAccess64,
+                        StackSymFunctionTableAccess64,
                         StackGetModuleBaseProc64,
                         StackTranslateAddressProc64))
             {

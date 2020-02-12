@@ -32,7 +32,6 @@ signals:
     void displayReferencesWidget();
     void displaySourceManagerWidget();
     void showPatches();
-    void displaySnowmanWidget();
     void displayLogWidget();
     void displayGraphWidget();
     void displaySymbolsWidget();
@@ -78,7 +77,6 @@ public slots:
     void binaryPasteIgnoreSizeSlot();
     void undoSelectionSlot();
     void showPatchesSlot();
-    void yaraSlot();
     void copySelectionSlot();
     void copySelectionToFileSlot();
     void copySelectionNoBytesSlot();
@@ -91,8 +89,6 @@ public slots:
     void labelCopySlot();
     void findCommandSlot();
     void openSourceSlot();
-    void decompileSelectionSlot();
-    void decompileFunctionSlot();
     void mnemonicHelpSlot();
     void mnemonicBriefSlot();
     void ActionTraceRecordBitSlot();

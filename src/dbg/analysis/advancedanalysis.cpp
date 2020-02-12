@@ -97,8 +97,23 @@ void AdvancedAnalysis::analyzeFunction(duint entryPoint, bool writedata)
             {
                 if(writedata)
                     mEncMap[node.end - mBase] = (byte)enc_byte;
+                // If the next byte would be out of the memory range finish this node
+                if(!inRange(node.end + 1))
+                {
+                    graph.AddNode(node);
+                    break;
+                }
                 node.end++;
                 continue;
+            }
+            // If the memory range doesn't fit the entire instruction
+            // mark it as bytes and finish this node
+            if(!inRange(node.end + mCp.Size() - 1))
+            {
+                duint remainingSize = mBase + mSize - node.end;
+                memset(&mEncMap[node.end - mBase], (byte)enc_byte, remainingSize);
+                graph.AddNode(node);
+                break;
             }
             if(writedata)
             {
@@ -134,6 +149,12 @@ void AdvancedAnalysis::analyzeFunction(duint entryPoint, bool writedata)
             if(mCp.IsRet()) //return
             {
                 node.terminal = true;
+                graph.AddNode(node);
+                break;
+            }
+            // If this instruction finishes the memory range, end the loop for this entry point
+            if(!inRange(node.end + mCp.Size()))
+            {
                 graph.AddNode(node);
                 break;
             }
@@ -263,8 +284,7 @@ void AdvancedAnalysis::writeDataXrefs()
                     //Todo: Analyze op type and set correct type
                     if(op.type == ZYDIS_OPERAND_TYPE_MEMORY)
                     {
-                        duint datasize = op.size / 8;
-                        duint size = datasize;
+                        duint size = op.size / 8;
                         duint offset = xref.addr - mBase;
                         switch(op.size)
                         {
@@ -296,15 +316,24 @@ void AdvancedAnalysis::writeDataXrefs()
                         default:
                             __debugbreak();
                         }
-                        if(datasize == 1)
+                        if(size == 1)
                         {
-                            memset(mEncMap + offset, (byte)type, size);
+                            mEncMap[offset] = (byte)type;
                         }
                         else
                         {
-                            memset(mEncMap + offset, (byte)enc_middle, size);
-                            for(duint j = offset; j < offset + size; j += datasize)
-                                mEncMap[j] = (byte)type;
+                            // Check if the entire referenced data fits into the memory range
+                            if((offset + size) <= mSize)
+                            {
+                                mEncMap[offset] = (byte)type;
+                                memset(mEncMap + offset + 1, (byte)enc_middle, size - 1);
+                            }
+                            else
+                            {
+                                // If it doesn't fit, mark the remaining places as bytes
+                                duint remainingSize = mSize - offset;
+                                memset(mEncMap + offset, (byte)enc_byte, size);
+                            }
                         }
                     }
                 }

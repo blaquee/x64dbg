@@ -5,7 +5,6 @@
 #include "GotoDialog.h"
 #include "XrefBrowseDialog.h"
 #include "LineEditDialog.h"
-#include "SnowmanView.h"
 #include <vector>
 #include <QPainter>
 #include <QScrollBar>
@@ -34,19 +33,7 @@ DisassemblerGraphView::DisassemblerGraphView(QWidget* parent)
     this->status = "Loading...";
 
     //Start disassembly view at the entry point of the binary
-    this->function = 0;
-    this->ready = false;
-    this->viewportReady = false;
-    this->desired_pos = nullptr;
-    this->highlight_token = nullptr;
-    this->cur_instr = 0;
-    this->scroll_base_x = 0;
-    this->scroll_base_y = 0;
-    this->scroll_mode = false;
-    this->drawOverview = false;
-    this->onlySummary = false;
-    this->blocks.clear();
-    this->saveGraph = false;
+    resetGraph();
 
     //Initialize zoom values
     this->graphZoomMode = ConfigBool("Gui", "GraphZoomMode");
@@ -86,6 +73,8 @@ DisassemblerGraphView::DisassemblerGraphView(QWidget* parent)
     connect(Bridge::getBridge(), SIGNAL(selectionGraphGet(SELECTIONDATA*)), this, SLOT(selectionGetSlot(SELECTIONDATA*)));
     connect(Bridge::getBridge(), SIGNAL(disassembleAt(dsint, dsint)), this, SLOT(disassembleAtSlot(dsint, dsint)));
     connect(Bridge::getBridge(), SIGNAL(focusGraph()), this, SLOT(setFocus()));
+    connect(Bridge::getBridge(), SIGNAL(getCurrentGraph(BridgeCFGraphList*)), this, SLOT(getCurrentGraphSlot(BridgeCFGraphList*)));
+    connect(Bridge::getBridge(), SIGNAL(dbgStateChanged(DBGSTATE)), this, SLOT(dbgStateChangedSlot(DBGSTATE)));
 
     //Connect to config
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
@@ -99,6 +88,29 @@ DisassemblerGraphView::DisassemblerGraphView(QWidget* parent)
 DisassemblerGraphView::~DisassemblerGraphView()
 {
     delete this->highlight_token;
+}
+
+void DisassemblerGraphView::resetGraph()
+{
+    this->function = 0;
+    this->ready = false;
+    this->viewportReady = false;
+    this->desired_pos = nullptr;
+    this->highlight_token = nullptr;
+    this->cur_instr = 0;
+    this->scroll_base_x = 0;
+    this->scroll_base_y = 0;
+    this->scroll_mode = false;
+    this->drawOverview = false;
+    this->onlySummary = false;
+    this->blocks.clear();
+    this->saveGraph = false;
+
+    this->analysis = Analysis();
+    this->currentGraph = BridgeCFGraph(0);
+    this->currentBlockMap.clear();
+
+    this->syncOrigin = false;
 }
 
 void DisassemblerGraphView::initFont()
@@ -1946,6 +1958,7 @@ void DisassemblerGraphView::loadCurrentGraph()
     if(ConfigBool("Gui", "GraphZoomMode"))
     {
         graphZoomMode = true;
+        drawOverview = false;
         setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     }
@@ -2071,7 +2084,7 @@ void DisassemblerGraphView::loadGraphSlot(BridgeCFGraphList* graphList, duint ad
         auto message = tr("The graph you are trying to render has a large number of nodes (%1). This can cause x64dbg to hang or crash. It is recommended to save your data before you continue.\n\nDo you want to continue rendering this graph?").arg(nodeCount);
         if(QMessageBox::question(this, title, message, QMessageBox::Yes, QMessageBox::No | QMessageBox::Default) == QMessageBox::No)
         {
-            Bridge::getBridge()->setResult(0);
+            Bridge::getBridge()->setResult(BridgeResult::LoadGraph, 0);
             return;
         }
     }
@@ -2081,12 +2094,12 @@ void DisassemblerGraphView::loadGraphSlot(BridgeCFGraphList* graphList, duint ad
     this->cur_instr = addr ? addr : this->function;
     this->forceCenter = true;
     loadCurrentGraph();
-    Bridge::getBridge()->setResult(1);
+    Bridge::getBridge()->setResult(BridgeResult::LoadGraph, 1);
 }
 
 void DisassemblerGraphView::graphAtSlot(duint addr)
 {
-    Bridge::getBridge()->setResult(this->navigate(addr) ? this->currentGraph.entryPoint : 0);
+    Bridge::getBridge()->setResult(BridgeResult::GraphAt, this->navigate(addr) ? this->currentGraph.entryPoint : 0);
 }
 
 void DisassemblerGraphView::updateGraphSlot()
@@ -2102,11 +2115,21 @@ void DisassemblerGraphView::updateGraphSlot()
     this->viewport()->update();
 }
 
-void DisassemblerGraphView::addReferenceAction(QMenu* menu, duint addr)
+void DisassemblerGraphView::addReferenceAction(QMenu* menu, duint addr, const QString & description)
 {
+    if(!DbgMemIsValidReadPtr(addr))
+        return;
+    auto addrText = ToPtrString(addr);
+    for(QAction* action : menu->actions())
+        if(action->data() == addrText)
+            return;
     QAction* action = new QAction(menu);
-    action->setData(ToPtrString(addr));
-    action->setText(getSymbolicName(addr));
+    action->setFont(font());
+    action->setData(addrText);
+    if(description.isEmpty())
+        action->setText(getSymbolicName(addr));
+    else
+        action->setText(description);
     connect(action, SIGNAL(triggered()), this, SLOT(followActionSlot()));
     menu->addAction(action);
 }
@@ -2142,7 +2165,7 @@ void DisassemblerGraphView::setupContextMenu()
 
     auto breakpointMenu = new BreakpointMenu(this, getActionHelperFuncs(), [this]()
     {
-        return zoomActionHelper() != 0;
+        return zoomActionHelper();
     });
     breakpointMenu->build(mMenuBuilder);
 
@@ -2195,15 +2218,46 @@ void DisassemblerGraphView::setupContextMenu()
         }
         if(currentInstruction)
         {
+            DISASM_INSTR instr = { 0 };
+            DbgDisasmAt(currentInstruction->addr, &instr);
+            for(int i = 0; i < instr.argcount; i++)
+            {
+                const DISASM_ARG & arg = instr.arg[i];
+                if(arg.type == arg_memory)
+                {
+                    QString segment = "";
+#ifdef _WIN64
+                    if(arg.segment == SEG_GS)
+                        segment = "gs:";
+#else //x32
+                    if(arg.segment == SEG_FS)
+                        segment = "fs:";
+#endif //_WIN64
+                    if(arg.value != arg.constant)
+                        addReferenceAction(menu, arg.value, tr("&Address: ") + segment + QString(arg.mnemonic).toUpper().trimmed());
+                    addReferenceAction(menu, arg.constant, tr("&Constant: ") + getSymbolicName(arg.constant));
+                    addReferenceAction(menu, arg.memvalue, tr("&Value: ") + segment + "[" + QString(arg.mnemonic) + "]");
+                }
+                else
+                {
+                    QString symbolicName = getSymbolicName(arg.value);
+                    QString mnemonic = QString(arg.mnemonic).trimmed();
+                    if(mnemonic != ToHexString(arg.value))
+                        mnemonic = mnemonic + ": " + symbolicName;
+                    else
+                        mnemonic = symbolicName;
+                    addReferenceAction(menu, arg.value, mnemonic);
+                }
+            }
+            menu->addSeparator();
             for(const duint & i : currentBlock->incoming) // This list is incomplete
-                addReferenceAction(menu, i);
+                addReferenceAction(menu, i, tr("Block incoming: %1").arg(getSymbolicName(i)));
             if(!currentBlock->block.terminal)
             {
                 menu->addSeparator();
                 for(const duint & i : currentBlock->block.exits)
-                    addReferenceAction(menu, i);
+                    addReferenceAction(menu, i, tr("Block exit %1").arg(getSymbolicName(i)));
             }
-            //to do: follow a constant
             return true;
         }
         return false;
@@ -2228,7 +2282,6 @@ void DisassemblerGraphView::setupContextMenu()
     });
 
     mMenuBuilder->addSeparator();
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("snowman.png"), tr("Decompile"), SLOT(decompileSlot()), "ActionGraphDecompile"));
     mMenuBuilder->addAction(mToggleOverview = makeShortcutAction(DIcon("graph.png"), tr("&Overview"), SLOT(toggleOverviewSlot()), "ActionGraphToggleOverview"), [this](QMenu*)
     {
         if(graphZoomMode)
@@ -2256,6 +2309,16 @@ void DisassemblerGraphView::setupContextMenu()
     }
     mediumLayout->setChecked(true);
     mMenuBuilder->addMenu(makeMenu(DIcon("layout.png"), tr("Layout")), layoutMenu);
+
+    mPluginMenu = new QMenu(this);
+    Bridge::getBridge()->emitMenuAddToList(this, mPluginMenu, GUI_GRAPH_MENU);
+    mMenuBuilder->addSeparator();
+    mMenuBuilder->addBuilder(new MenuBuilder(this, [this](QMenu * menu)
+    {
+        DbgMenuPrepare(GUI_GRAPH_MENU);
+        menu->addActions(mPluginMenu->actions());
+        return true;
+    }));
 
     mMenuBuilder->loadFromConfig();
 }
@@ -2345,6 +2408,8 @@ void DisassemblerGraphView::shortcutsUpdatedSlot()
 
 void DisassemblerGraphView::toggleOverviewSlot()
 {
+    if(graphZoomMode)
+        return;
     drawOverview = !drawOverview;
     if(onlySummary)
     {
@@ -2366,7 +2431,7 @@ void DisassemblerGraphView::toggleSummarySlot()
 void DisassemblerGraphView::selectionGetSlot(SELECTIONDATA* selection)
 {
     selection->start = selection->end = cur_instr;
-    Bridge::getBridge()->setResult(1);
+    Bridge::getBridge()->setResult(BridgeResult::SelectionGet, 1);
 }
 
 void DisassemblerGraphView::disassembleAtSlot(dsint va, dsint cip)
@@ -2510,7 +2575,6 @@ restart:
 
 void DisassemblerGraphView::xrefSlot()
 {
-
     if(!DbgIsDebugging())
         return;
     duint wVA = this->get_cursor_pos();
@@ -2525,34 +2589,6 @@ void DisassemblerGraphView::xrefSlot()
         mXrefDlg = new XrefBrowseDialog(this);
     mXrefDlg->setup(wVA, "graph");
     mXrefDlg->showNormal();
-}
-
-void DisassemblerGraphView::decompileSlot()
-{
-    std::vector<SnowmanRange> ranges;
-    ranges.reserve(currentGraph.nodes.size());
-
-    if(!DbgIsDebugging())
-        return;
-    if(currentGraph.nodes.empty())
-        return;
-    SnowmanRange r;
-    for(const auto & nodeIt : currentGraph.nodes)
-    {
-        const BridgeCFNode & node = nodeIt.second;
-        r.start = node.instrs.empty() ? node.start : node.instrs[0].addr;
-        r.end = node.instrs.empty() ? node.end : node.instrs[node.instrs.size() - 1].addr;
-        BASIC_INSTRUCTION_INFO info;
-        DbgDisasmFastAt(r.end, &info);
-        r.end += info.size - 1;
-        ranges.push_back(r);
-    }
-    std::sort(ranges.begin(), ranges.end(), [](const SnowmanRange & a, const SnowmanRange & b)
-    {
-        return a.start > b.start;
-    });
-    emit displaySnowmanWidget();
-    DecompileRanges(Bridge::getBridge()->snowmanView, ranges.data(), ranges.size());
 }
 
 void DisassemblerGraphView::followActionSlot()
@@ -2595,4 +2631,19 @@ void DisassemblerGraphView::zoomToCursorSlot()
     auto areaSize = viewport()->size();
     this->adjustSize(areaSize.width(), areaSize.height(), pos);
     this->viewport()->update();
+}
+
+void DisassemblerGraphView::getCurrentGraphSlot(BridgeCFGraphList* graphList)
+{
+    *graphList = currentGraph.ToGraphList();
+    Bridge::getBridge()->setResult(BridgeResult::GraphCurrent);
+}
+
+void DisassemblerGraphView::dbgStateChangedSlot(DBGSTATE state)
+{
+    if(state == stopped)
+    {
+        resetGraph();
+        this->viewport()->update();
+    }
 }

@@ -115,30 +115,27 @@ RichTextPainter::List TraceBrowser::getRichBytes(const Instruction_t & instr) co
     if(!richBytes.empty() && richBytes.back().text.endsWith(' '))
         richBytes.back().text.chop(1); //remove trailing space if exists
 
-    if(DbgIsDebugging())
+    for(size_t i = 0; i < richBytes.size(); i++)
     {
-        for(size_t i = 0; i < richBytes.size(); i++)
+        auto byteIdx = realBytes[i].first;
+        auto isReal = realBytes[i].second;
+        RichTextPainter::CustomRichText_t & curByte = richBytes.at(i);
+        DBGRELOCATIONINFO relocInfo;
+        curByte.highlightColor = mDisassemblyRelocationUnderlineColor;
+        if(DbgIsDebugging() && DbgFunctions()->ModRelocationAtAddr(cur_addr + byteIdx, &relocInfo))
         {
-            auto byteIdx = realBytes[i].first;
-            auto isReal = realBytes[i].second;
-            RichTextPainter::CustomRichText_t & curByte = richBytes.at(i);
-            DBGRELOCATIONINFO relocInfo;
-            curByte.highlightColor = mDisassemblyRelocationUnderlineColor;
-            if(DbgFunctions()->ModRelocationAtAddr(cur_addr + byteIdx, &relocInfo))
-            {
-                bool prevInSameReloc = relocInfo.rva < cur_addr + byteIdx - DbgFunctions()->ModBaseFromAddr(cur_addr + byteIdx);
-                curByte.highlight = isReal;
-                curByte.highlightConnectPrev = i > 0 && prevInSameReloc;
-            }
-            else
-            {
-                curByte.highlight = false;
-                curByte.highlightConnectPrev = false;
-            }
-
-            curByte.textColor = mBytesColor;
-            curByte.textBackground = mBytesBackgroundColor;
+            bool prevInSameReloc = relocInfo.rva < cur_addr + byteIdx - DbgFunctions()->ModBaseFromAddr(cur_addr + byteIdx);
+            curByte.highlight = isReal;
+            curByte.highlightConnectPrev = i > 0 && prevInSameReloc;
         }
+        else
+        {
+            curByte.highlight = false;
+            curByte.highlightConnectPrev = false;
+        }
+
+        curByte.textColor = mBytesColor;
+        curByte.textBackground = mBytesBackgroundColor;
     }
     return richBytes;
 }
@@ -690,7 +687,8 @@ void TraceBrowser::mouseDoubleClickEvent(QMouseEvent* event)
     {
         switch(getColumnIndexFromX(event->x()))
         {
-        case 0://Index: ???
+        case 0://Index: follow
+            followDisassemblySlot();
             break;
         case 1://Address: set RVA
             if(mRvaDisplayEnabled && mTraceFile->Registers(getInitialSelection()).regcontext.cip == mRvaDisplayBase)
@@ -705,7 +703,8 @@ void TraceBrowser::mouseDoubleClickEvent(QMouseEvent* event)
         case 2: //Opcode: Breakpoint
             mBreakpointMenu->toggleInt3BPActionSlot();
             break;
-        case 3: //Instructions: ???
+        case 3: //Instructions: follow
+            followDisassemblySlot();
             break;
         case 4: //Comment
             setCommentSlot();

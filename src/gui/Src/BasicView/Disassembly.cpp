@@ -3,7 +3,6 @@
 #include "CodeFolding.h"
 #include "EncodeMap.h"
 #include "Bridge.h"
-#include "MainWindow.h"
 #include "CachedFontMetrics.h"
 #include "QBeaEngine.h"
 #include "MemoryPage.h"
@@ -60,7 +59,7 @@ Disassembly::Disassembly(QWidget* parent) : AbstractTableView(parent)
     mXrefInfo.refcount = 0;
 
     // Slots
-    connect(Bridge::getBridge(), SIGNAL(repaintGui()), this, SLOT(reloadData()));
+    connect(Bridge::getBridge(), SIGNAL(updateDisassembly()), this, SLOT(reloadData()));
     connect(Bridge::getBridge(), SIGNAL(dbgStateChanged(DBGSTATE)), this, SLOT(debugStateChangedSlot(DBGSTATE)));
     connect(this, SIGNAL(selectionChanged(dsint)), this, SLOT(selectionChangedSlot(dsint)));
     connect(Config(), SIGNAL(tokenizerConfigUpdated()), this, SLOT(tokenizerConfigUpdatedSlot()));
@@ -453,7 +452,7 @@ QString Disassembly::paintContent(QPainter* painter, dsint rowBase, int rowOffse
         int jumpsize = paintJumpsGraphic(painter, x + funcsize, y - 1, wRVA, branchType != Instruction_t::None && branchType != Instruction_t::Call); //jump line
 
         //draw bytes
-        auto richBytes = getRichBytes(instr);
+        auto richBytes = getRichBytes(instr, wIsSelected);
         RichTextPainter::paintRichText(painter, x, y, getColumnWidth(col), getRowHeight(), jumpsize + funcsize, richBytes, mFontMetrics);
     }
     break;
@@ -850,7 +849,22 @@ void Disassembly::keyPressEvent(QKeyEvent* event)
 {
     int key = event->key();
 
-    if(key == Qt::Key_Up || key == Qt::Key_Down)
+    if(event->modifiers() == (Qt::ControlModifier | Qt::AltModifier))
+    {
+        ShowDisassemblyPopup(0, 0, 0);
+
+        if(key == Qt::Key_Left)
+        {
+            setTableOffset(getTableOffset() - 1);
+        }
+        else if(key == Qt::Key_Right)
+        {
+            setTableOffset(getTableOffset() + 1);
+        }
+
+        updateViewport();
+    }
+    else if(key == Qt::Key_Up || key == Qt::Key_Down)
     {
         ShowDisassemblyPopup(0, 0, 0);
 
@@ -864,7 +878,7 @@ void Disassembly::keyPressEvent(QKeyEvent* event)
         dsint initialStart = getSelectionStart();
 
         if(key == Qt::Key_Up)
-            selectPrevious(expand);
+            selectPrevious(expand); //TODO: fix this shit to actually go to whatever the previous instruction shows
         else
             selectNext(expand);
 
@@ -886,7 +900,7 @@ void Disassembly::keyPressEvent(QKeyEvent* event)
     {
         ShowDisassemblyPopup(0, 0, 0);
         duint dest = DbgGetBranchDestination(rvaToVa(getInitialSelection()));
-        if(!dest)
+        if(!DbgMemIsValidReadPtr(dest))
             return;
         QString cmd = "disasm " + ToPtrString(dest);
         DbgCmdExec(cmd.toUtf8().constData());
@@ -1615,7 +1629,7 @@ void Disassembly::prepareDataRange(dsint startRva, dsint endRva, const std::func
     }
 }
 
-RichTextPainter::List Disassembly::getRichBytes(const Instruction_t & instr) const
+RichTextPainter::List Disassembly::getRichBytes(const Instruction_t & instr, bool isSelected) const
 {
     RichTextPainter::List richBytes;
     std::vector<std::pair<size_t, bool>> realBytes;
@@ -1625,16 +1639,19 @@ RichTextPainter::List Disassembly::getRichBytes(const Instruction_t & instr) con
     if(!richBytes.empty() && richBytes.back().text.endsWith(' '))
         richBytes.back().text.chop(1); //remove trailing space if exists
 
+    auto selectionFromVa = rvaToVa(mSelection.fromIndex);
+    auto selectionToVa = rvaToVa(mSelection.toIndex);
     for(size_t i = 0; i < richBytes.size(); i++)
     {
         auto byteIdx = realBytes[i].first;
+        auto byteAddr = cur_addr + byteIdx;
         auto isReal = realBytes[i].second;
         RichTextPainter::CustomRichText_t & curByte = richBytes.at(i);
         DBGRELOCATIONINFO relocInfo;
         curByte.highlightColor = mDisassemblyRelocationUnderlineColor;
-        if(DbgFunctions()->ModRelocationAtAddr(cur_addr + byteIdx, &relocInfo))
+        if(DbgFunctions()->ModRelocationAtAddr(byteAddr, &relocInfo))
         {
-            bool prevInSameReloc = relocInfo.rva < cur_addr + byteIdx - DbgFunctions()->ModBaseFromAddr(cur_addr + byteIdx);
+            bool prevInSameReloc = relocInfo.rva < byteAddr - DbgFunctions()->ModBaseFromAddr(byteAddr);
             curByte.highlight = isReal;
             curByte.highlightConnectPrev = i > 0 && prevInSameReloc;
         }
@@ -1645,7 +1662,7 @@ RichTextPainter::List Disassembly::getRichBytes(const Instruction_t & instr) con
         }
 
         DBGPATCHINFO patchInfo;
-        if(isReal && DbgFunctions()->PatchGetEx(cur_addr + byteIdx, &patchInfo))
+        if(isReal && DbgFunctions()->PatchGetEx(byteAddr, &patchInfo))
         {
             if((unsigned char)(instr.dump.at(byteIdx)) == patchInfo.newbyte)
             {
@@ -1662,6 +1679,15 @@ RichTextPainter::List Disassembly::getRichBytes(const Instruction_t & instr) con
         {
             curByte.textColor = mBytesColor;
             curByte.textBackground = mBytesBackgroundColor;
+        }
+
+        if(curByte.textBackground.alpha() == 0)
+        {
+            auto byteSelected = byteAddr >= selectionFromVa && byteAddr <= selectionToVa;
+            if(isSelected && !byteSelected)
+                curByte.textBackground = mBackgroundColor;
+            else if(!isSelected && byteSelected)
+                curByte.textBackground = mSelectionColor;
         }
     }
 
@@ -1753,7 +1779,6 @@ void Disassembly::disassembleAt(dsint parVA, dsint parCIP, bool history, dsint n
             mCurrentVa++;
             newHistory.va = selectionVA;
             newHistory.tableOffset = selectionTableOffset;
-            newHistory.windowTitle = MainWindow::windowTitle;
             mVaHistory.push_back(newHistory);
         }
     }
@@ -1815,7 +1840,6 @@ void Disassembly::disassembleAt(dsint parVA, dsint parCIP, bool history, dsint n
             //new disassembled address
             newHistory.va = parVA;
             newHistory.tableOffset = getTableOffset();
-            newHistory.windowTitle = MainWindow::windowTitle;
             if(mVaHistory.size())
             {
                 if(mVaHistory.last().va != parVA) //not 2x the same va in history
@@ -1925,7 +1949,7 @@ void Disassembly::historyPrevious()
     disassembleAt(va, rvaToVa(mCipRva), false, mVaHistory.at(mCurrentVa).tableOffset);
 
     // Update window title
-    emit updateWindowTitle(mVaHistory.at(mCurrentVa).windowTitle);
+    DbgCmdExecDirect(QString("guiupdatetitle %1").arg(ToPtrString(va)));
     GuiUpdateAllViews();
 }
 
@@ -1940,7 +1964,7 @@ void Disassembly::historyNext()
     disassembleAt(va, rvaToVa(mCipRva), false, mVaHistory.at(mCurrentVa).tableOffset);
 
     // Update window title
-    emit updateWindowTitle(mVaHistory.at(mCurrentVa).windowTitle);
+    DbgCmdExecDirect(QString("guiupdatetitle %1").arg(ToPtrString(va)));
     GuiUpdateAllViews();
 }
 

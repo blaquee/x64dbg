@@ -208,6 +208,7 @@ public:
 
     DisassemblerGraphView(QWidget* parent = nullptr);
     ~DisassemblerGraphView();
+    void resetGraph();
     void initFont();
     void adjustSize(int viewportWidth, int viewportHeight, QPoint mousePosition = QPoint(0, 0), bool fitToWindow = false);
     void resizeEvent(QResizeEvent* event);
@@ -257,9 +258,6 @@ public:
 
     VaHistory mHistory;
 
-signals:
-    void displaySnowmanWidget();
-
 public slots:
     void loadGraphSlot(BridgeCFGraphList* graph, duint addr);
     void graphAtSlot(duint addr);
@@ -285,9 +283,10 @@ public slots:
     void setCommentSlot();
     void setLabelSlot();
     void xrefSlot();
-    void decompileSlot();
     void fitToWindowSlot();
     void zoomToCursorSlot();
+    void getCurrentGraphSlot(BridgeCFGraphList* graphList);
+    void dbgStateChangedSlot(DBGSTATE state);
 
 private:
     bool graphZoomMode;
@@ -328,6 +327,7 @@ private:
     std::vector<int> row_edge_y;
     CachedFontMetrics* mFontMetrics;
     MenuBuilder* mMenuBuilder;
+    QMenu* mPluginMenu;
     bool drawOverview;
     bool onlySummary;
     bool syncOrigin;
@@ -377,7 +377,7 @@ private:
     GotoDialog* mGoto;
     XrefBrowseDialog* mXrefDlg;
 
-    void addReferenceAction(QMenu* menu, duint addr);
+    void addReferenceAction(QMenu* menu, duint addr, const QString & description);
 };
 
 #endif // DISASSEMBLERGRAPHVIEW_H

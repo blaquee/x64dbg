@@ -695,7 +695,7 @@
        <item>
         <widget class="QCheckBox" name="chkGraphZoomMode">
          <property name="text">
-          <string>Graph zoom mode (beta)</string>
+          <string>Graph zoom mode</string>
          </property>
         </widget>
        </item>
@@ -852,6 +852,13 @@
         <widget class="QCheckBox" name="chkQueryWorkingSet">
          <property name="text">
           <string>Query working set before reading memory</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="chkTransparentExceptionStepping">
+         <property name="text">
+          <string>Transparent exception stepping*</string>
          </property>
         </widget>
        </item>

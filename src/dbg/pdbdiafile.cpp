@@ -274,7 +274,7 @@ bool PDBDiaFile::open(const wchar_t* file, uint64_t loadAddress, DiaValidationDa
 
     if(validationData != nullptr)
     {
-        CComPtr<IDiaSymbol> globalSym;
+        IDiaSymbol* globalSym = nullptr;
         hr = m_session->get_globalScope(&globalSym);
         if(testError(hr))
         {
@@ -286,40 +286,58 @@ bool PDBDiaFile::open(const wchar_t* file, uint64_t loadAddress, DiaValidationDa
             hr = globalSym->get_age(&age);
             if(!testError(hr) && validationData->age != age)
             {
+                globalSym->Release();
                 close();
 
-                GuiSymbolLogAdd("PDB age is not matching.\n");
+                GuiSymbolLogAdd(StringUtils::sprintf("Validation error: PDB age is not matching (expected: %u, actual: %u).\n", validationData->age, age).c_str());
                 return false;
             }
 
-            // NOTE: For some reason this never matches, commented for now.
-            // ^ 99% sure this should only be used for PDB v2.0 ('NB10' ones). v7.0 PDBs should be checked using (age+guid) only
-            /*
-            DWORD signature = 0;
-            hr = globalSym->get_signature(&signature);
-            if (!testError(hr) && validationData->signature != signature)
+            if(validationData->signature != 0)
             {
-                close();
+                // PDB v2.0 ('NB10' ones) do not have a GUID and they use a signature and age
+                DWORD signature = 0;
+                hr = globalSym->get_signature(&signature);
+                if(!testError(hr) && validationData->signature != signature)
+                {
+                    globalSym->Release();
+                    close();
 
-                GuiSymbolLogAdd("PDB is not matching.\n");
-                return false;
+                    GuiSymbolLogAdd(StringUtils::sprintf("Validation error: PDB signature is not matching (expected: %08X, actual: %08X).\n",
+                                                         signature, validationData->signature).c_str());
+                    return false;
+                }
             }
-            */
-
-            GUID guid = {0};
-            hr = globalSym->get_guid(&guid);
-            if(!testError(hr) && memcmp(&guid, &validationData->guid, sizeof(GUID)) != 0)
+            else
             {
-                close();
+                // v7.0 PDBs should be checked using (age+guid) only
+                GUID guid = { 0 };
+                hr = globalSym->get_guid(&guid);
+                if(!testError(hr) && memcmp(&guid, &validationData->guid, sizeof(GUID)) != 0)
+                {
+                    globalSym->Release();
+                    close();
 
-                GuiSymbolLogAdd("PDB guid is not matching.\n");
-                return false;
+                    auto guidStr = [](const GUID & guid) -> String
+                    {
+                        // https://stackoverflow.com/a/22848342/1806760
+                        char guid_string[37]; // 32 hex chars + 4 hyphens + null terminator
+                        sprintf_s(guid_string,
+                        "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+                        guid.Data1, guid.Data2, guid.Data3,
+                        guid.Data4[0], guid.Data4[1], guid.Data4[2],
+                        guid.Data4[3], guid.Data4[4], guid.Data4[5],
+                        guid.Data4[6], guid.Data4[7]);
+                        return guid_string;
+                    };
+
+                    GuiSymbolLogAdd(StringUtils::sprintf("Validation error: PDB guid is not matching (expected: %s, actual: %s).\n",
+                                                         guidStr(validationData->guid).c_str(), guidStr(guid).c_str()).c_str());
+                    return false;
+                }
             }
         }
-    }
-    else
-    {
-        GuiSymbolLogAdd("Skipping PDB validation, expect invalid results!\n");
+        globalSym->Release();
     }
 
     if(loadAddress != 0)
@@ -379,7 +397,6 @@ std::string PDBDiaFile::getSymbolNameString(IDiaSymbol* sym)
     BSTR str = nullptr;
 
     std::string name;
-    std::string res;
 
     hr = sym->get_name(&str);
     if(hr != S_OK)
@@ -390,16 +407,9 @@ std::string PDBDiaFile::getSymbolNameString(IDiaSymbol* sym)
         name = StringUtils::Utf16ToUtf8(str);
     }
 
-    res = name;
     SysFreeString(str);
 
-    size_t pos = res.find('(');
-    if(pos != std::string::npos)
-    {
-        res = res.substr(0, pos);
-    }
-
-    return res;
+    return name;
 }
 
 std::string PDBDiaFile::getSymbolUndecoratedNameString(IDiaSymbol* sym)
@@ -426,7 +436,7 @@ std::string PDBDiaFile::getSymbolUndecoratedNameString(IDiaSymbol* sym)
     return result;
 }
 
-bool PDBDiaFile::enumerateLineNumbers(uint32_t rva, uint32_t size, std::vector<DiaLineInfo_t> & lines, std::map<DWORD, std::string> & files)
+bool PDBDiaFile::enumerateLineNumbers(uint32_t rva, uint32_t size, std::vector<DiaLineInfo_t> & lines, std::map<DWORD, std::string> & files, const std::atomic<bool> & cancelled)
 {
     HRESULT hr;
     DWORD lineNumber = 0;
@@ -447,49 +457,69 @@ bool PDBDiaFile::enumerateLineNumbers(uint32_t rva, uint32_t size, std::vector<D
         return true;
 
     lines.reserve(lines.size() + lineCount);
-    std::vector<IDiaLineNumber*> lineNumbers;
-    lineNumbers.resize(lineCount);
 
-    ULONG fetched = 0;
-    hr = lineNumbersEnum->Next(lineCount, lineNumbers.data(), &fetched);
-    for(ULONG n = 0; n < fetched; n++)
+    const ULONG bucket = 10000;
+    ULONG steps = lineCount / bucket + (lineCount % bucket != 0);
+    for(ULONG step = 0; step < steps; step++)
     {
-        CComPtr<IDiaLineNumber> lineNumberInfo;
-        lineNumberInfo.Attach(lineNumbers[n]);
+        ULONG begin = step * bucket;
+        ULONG end = min(lineCount, (step + 1) * bucket);
 
-        DWORD sourceFileId = 0;
-        hr = lineNumberInfo->get_sourceFileId(&sourceFileId);
-        if(!SUCCEEDED(hr))
-            continue;
+        if(cancelled)
+            return false;
 
-        if(!files.count(sourceFileId))
+        std::vector<IDiaLineNumber*> lineNumbers;
+        ULONG lineCountStep = end - begin;
+        lineNumbers.resize(lineCountStep);
+
+        ULONG fetched = 0;
+        hr = lineNumbersEnum->Next((ULONG)lineNumbers.size(), lineNumbers.data(), &fetched);
+        for(ULONG n = 0; n < fetched; n++)
         {
-            CComPtr<IDiaSourceFile> sourceFile;
-            hr = lineNumberInfo->get_sourceFile(&sourceFile);
+            if(cancelled)
+            {
+                for(ULONG m = n; m < fetched; m++)
+                    lineNumbers[m]->Release();
+                return false;
+            }
+
+            CComPtr<IDiaLineNumber> lineNumberInfo;
+            lineNumberInfo.Attach(lineNumbers[n]);
+
+            DWORD sourceFileId = 0;
+            hr = lineNumberInfo->get_sourceFileId(&sourceFileId);
             if(!SUCCEEDED(hr))
                 continue;
 
-            BSTR fileName = nullptr;
-            hr = sourceFile->get_fileName(&fileName);
+            if(!files.count(sourceFileId))
+            {
+                CComPtr<IDiaSourceFile> sourceFile;
+                hr = lineNumberInfo->get_sourceFile(&sourceFile);
+                if(!SUCCEEDED(hr))
+                    continue;
+
+                BSTR fileName = nullptr;
+                hr = sourceFile->get_fileName(&fileName);
+                if(!SUCCEEDED(hr))
+                    continue;
+
+                files.insert({ sourceFileId, StringUtils::Utf16ToUtf8(fileName) });
+                SysFreeString(fileName);
+            }
+
+            DiaLineInfo_t lineInfo;
+            lineInfo.sourceFileId = sourceFileId;
+
+            hr = lineNumberInfo->get_lineNumber(&lineInfo.lineNumber);
             if(!SUCCEEDED(hr))
                 continue;
 
-            files.insert({ sourceFileId, StringUtils::Utf16ToUtf8(fileName) });
-            SysFreeString(fileName);
+            hr = lineNumberInfo->get_relativeVirtualAddress(&lineInfo.rva);
+            if(!SUCCEEDED(hr))
+                continue;
+
+            lines.push_back(lineInfo);
         }
-
-        DiaLineInfo_t lineInfo;
-        lineInfo.sourceFileId = sourceFileId;
-
-        hr = lineNumberInfo->get_lineNumber(&lineInfo.lineNumber);
-        if(!SUCCEEDED(hr))
-            continue;
-
-        hr = lineNumberInfo->get_relativeVirtualAddress(&lineInfo.rva);
-        if(!SUCCEEDED(hr))
-            continue;
-
-        lines.push_back(lineInfo);
     }
 
     return true;
@@ -996,7 +1026,7 @@ bool PDBDiaFile::convertSymbolInfo(IDiaSymbol* symbol, DiaSymbol_t & symbolInfo,
 
     symbolInfo.name = getSymbolNameString(symbol);
 
-    if(context.collectUndecoratedNames && !symbolInfo.name.empty() && symbolInfo.name.at(0) == '?')
+    if(context.collectUndecoratedNames && !symbolInfo.name.empty() && (symbolInfo.name.at(0) == '?' || symbolInfo.name.at(0) == '_' || symbolInfo.name.at(0) == '@'))
     {
         undecorateName(symbolInfo.name, symbolInfo.undecoratedName);
     }

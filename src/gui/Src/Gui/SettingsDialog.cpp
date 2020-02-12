@@ -82,6 +82,7 @@ void SettingsDialog::LoadSettings()
     settings.disasmNoSourceLineAutoComments = false;
     settings.disasmMaxModuleSize = -1;
     settings.guiNoForegroundWindow = true;
+    settings.guiLoadSaveTabOrder = true;
     settings.guiDisableAutoComplete = false;
     settings.guiAsciiAddressDumpMode = false;
 
@@ -289,7 +290,7 @@ void SettingsDialog::LoadSettings()
 
         ui->chkConfirmBeforeAtt->setCheckState(bool2check(settings.miscSetJITAuto));
 
-        if(!DbgFunctions()->IsProcessElevated())
+        if(!BridgeIsProcessElevated())
         {
             ui->chkSetJIT->setDisabled(true);
             ui->chkConfirmBeforeAtt->setDisabled(true);
@@ -319,10 +320,12 @@ void SettingsDialog::LoadSettings()
     GetSettingBool("Misc", "UseLocalHelpFile", &settings.miscUseLocalHelpFile);
     GetSettingBool("Misc", "QueryProcessCookie", &settings.miscQueryProcessCookie);
     GetSettingBool("Misc", "QueryWorkingSet", &settings.miscQueryWorkingSet);
+    GetSettingBool("Misc", "TransparentExceptionStepping", &settings.miscTransparentExceptionStepping);
     ui->chkUtf16LogRedirect->setChecked(settings.miscUtf16LogRedirect);
     ui->chkUseLocalHelpFile->setChecked(settings.miscUseLocalHelpFile);
     ui->chkQueryProcessCookie->setChecked(settings.miscQueryProcessCookie);
     ui->chkQueryWorkingSet->setChecked(settings.miscQueryWorkingSet);
+    ui->chkTransparentExceptionStepping->setChecked(settings.miscTransparentExceptionStepping);
 }
 
 void SettingsDialog::SaveSettings()
@@ -424,6 +427,7 @@ void SettingsDialog::SaveSettings()
     BridgeSettingSetUint("Misc", "UseLocalHelpFile", settings.miscUseLocalHelpFile);
     BridgeSettingSetUint("Misc", "QueryProcessCookie", settings.miscQueryProcessCookie);
     BridgeSettingSetUint("Misc", "QueryWorkingSet", settings.miscQueryWorkingSet);
+    BridgeSettingSetUint("Misc", "TransparentExceptionStepping", settings.miscTransparentExceptionStepping);
 
     BridgeSettingFlush();
     Config()->load();
@@ -909,4 +913,9 @@ void SettingsDialog::on_chkQueryProcessCookie_toggled(bool checked)
 void SettingsDialog::on_chkQueryWorkingSet_toggled(bool checked)
 {
     settings.miscQueryWorkingSet = checked;
+}
+
+void SettingsDialog::on_chkTransparentExceptionStepping_toggled(bool checked)
+{
+    settings.miscTransparentExceptionStepping = checked;
 }
