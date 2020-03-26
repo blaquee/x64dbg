@@ -68,7 +68,6 @@ static EXCEPTION_DEBUG_INFO lastExceptionInfo = { 0 };
 static char szDebuggeeInitializationScript[MAX_PATH] = "";
 static WString gInitExe, gInitCmd, gInitDir, gDllLoader;
 static CookieQuery cookie;
-static bool bDatabaseLoaded = false;
 static duint exceptionDispatchAddr = 0;
 static bool bPausedOnException = false;
 char szProgramDir[MAX_PATH] = "";
@@ -1368,10 +1367,6 @@ static void cbCreateProcess(CREATE_PROCESS_DEBUG_INFO* CreateProcessInfo)
 
     GuiDumpAt(MemFindBaseAddr(GetContextDataEx(CreateProcessInfo->hThread, UE_CIP), 0) + PAGE_SIZE); //dump somewhere
 
-    // Init program database
-    DbLoad(DbLoadSaveType::DebugData);
-    bDatabaseLoaded = true;
-
     ModLoad((duint)base, 1, DebugFileName);
 
     char modname[256] = "";
@@ -1582,15 +1577,21 @@ static DWORD WINAPI cbInitializationScriptThread(void*)
     Memory<char*> script(MAX_SETTING_SIZE + 1);
     if(BridgeSettingGet("Engine", "InitializeScript", script())) // Global script file
     {
-        if(scriptLoadSync(script()) == 0)
-            scriptRunSync((void*)0);
+        if(scriptLoadSync(script()))
+        {
+            if(scriptRunSync(0, true))
+                scriptunload();
+        }
         else
             dputs(QT_TRANSLATE_NOOP("DBG", "Error: Cannot load global initialization script."));
     }
     if(szDebuggeeInitializationScript[0] != 0)
     {
-        if(scriptLoadSync(szDebuggeeInitializationScript) == 0)
-            scriptRunSync((void*)0);
+        if(scriptLoadSync(szDebuggeeInitializationScript))
+        {
+            if(scriptRunSync(0, true))
+                scriptunload();
+        }
         else
             dputs(QT_TRANSLATE_NOOP("DBG", "Error: Cannot load debuggee initialization script."));
     }
@@ -2558,7 +2559,6 @@ static void debugLoopFunction(void* lpParameter, bool attach)
     bIsAttached = attach;
     dbgsetskipexceptions(false);
     bFreezeStack = false;
-    bDatabaseLoaded = false;
 
     //prepare attach/createprocess
     DWORD pid;
@@ -2704,6 +2704,9 @@ static void debugLoopFunction(void* lpParameter, bool attach)
         plugincbcall(CB_ATTACH, &attachInfo);
     }
 
+    // Init program database
+    DbLoad(DbLoadSaveType::DebugData);
+
     //run debug loop (returns when process debugging is stopped)
     if(attach)
     {
@@ -2722,8 +2725,8 @@ static void debugLoopFunction(void* lpParameter, bool attach)
         DebugLoop();
     }
 
-    if(bDatabaseLoaded) //fixes data loss when attach failed (https://github.com/x64dbg/x64dbg/issues/1899)
-        DbClose();
+    //fixes data loss when attach failed (https://github.com/x64dbg/x64dbg/issues/1899)
+    DbClose();
 
     //call plugin callback
     PLUG_CB_STOPDEBUG stopInfo;
