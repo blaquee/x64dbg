@@ -2,9 +2,9 @@
 
 if "%OLDPATH%"=="" set OLDPATH=%PATH%
 
-if "%QT32PATH%"=="" set QT32PATH=c:\Qt\qt-5.6.2-x86-msvc2013\5.6\msvc2013\bin
-if "%QT64PATH%"=="" set QT64PATH=c:\Qt\qt-5.6.2-x64-msvc2013\5.6\msvc2013_64\bin
-if "%QTCREATORPATH%"=="" set QTCREATORPATH=c:\Qt\qtcreator-4.3.1\bin
+if "%QT32PATH%"=="" set QT32PATH=C:\Qt5\5.6\msvc2013\bin
+if "%QT64PATH%"=="" set QT64PATH=C:\Qt5\5.6\msvc2013_64\bin
+if "%QTCREATORPATH%"=="" set QTCREATORPATH=C:\Qt5\Tools\QtCreator\bin
 if "%VSVARSALLPATH%"=="" set VSVARSALLPATH=c:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat
 if "%COVERITYPATH%"=="" set COVERITYPATH=c:\coverity\bin
 

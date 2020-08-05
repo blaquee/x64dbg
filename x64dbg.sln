@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.40629.0
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30002.166
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "x64dbg_exe", "src\exe\x64dbg_exe.vcxproj", "{3A22175E-6B72-FDCC-1603-C4A2163C7900}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -19,6 +19,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "x64dbg_launcher", "src\launcher\x64dbg_launcher.vcxproj", "{AC3F927A-4079-4C97-B8BE-8D04546802E7}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zydis_wrapper", "src\zydis_wrapper\zydis_wrapper.vcxproj", "{3B2C1EE1-FDEC-4D85-BE46-3C6A5EA69883}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "x64dbg", "src\gui\x64dbg.vcxproj", "{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -68,8 +70,17 @@ Global
 		{3B2C1EE1-FDEC-4D85-BE46-3C6A5EA69883}.Release|Win32.Build.0 = Release|Win32
 		{3B2C1EE1-FDEC-4D85-BE46-3C6A5EA69883}.Release|x64.ActiveCfg = Release|x64
 		{3B2C1EE1-FDEC-4D85-BE46-3C6A5EA69883}.Release|x64.Build.0 = Release|x64
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Debug|Win32.ActiveCfg = Debug|Win32
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Debug|Win32.Build.0 = Debug|Win32
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Debug|x64.ActiveCfg = Debug|Win32
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Release|Win32.ActiveCfg = Release|Win32
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Release|Win32.Build.0 = Release|Win32
+		{36D8A93D-3B0D-309E-9E14-A6CB7B9E5999}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D0EC600D-20F6-407F-8196-ED538AC1CE8A}
 	EndGlobalSection
 EndGlobal
