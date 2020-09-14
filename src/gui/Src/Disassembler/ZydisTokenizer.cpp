@@ -12,7 +12,7 @@ ZydisTokenizer::ZydisTokenizer(int maxModuleLength)
     SetConfig(false, false, false, false, false, false, false, false, false);
 }
 
-static ZydisTokenizer::TokenColor colorNamesMap[ZydisTokenizer::TokenType::Last];
+static ZydisTokenizer::TokenColor colorNamesMap[size_t(ZydisTokenizer::TokenType::Last)];
 QHash<QString, int> ZydisTokenizer::stringPoolMap;
 int ZydisTokenizer::poolId = 0;
 
@@ -169,6 +169,33 @@ bool ZydisTokenizer::TokenizeData(const QString & datatype, const QString & data
     return true;
 }
 
+void ZydisTokenizer::TokenizeTraceRegister(const char* reg, duint oldValue, duint newValue, std::vector<SingleToken> & tokens)
+{
+    if(tokens.size() > 0)
+    {
+        tokens.push_back(SingleToken(TokenType::ArgumentSpace, " ", TokenValue()));
+    }
+    QString regName(reg);
+    tokens.push_back(SingleToken(TokenType::GeneralRegister, ConfigBool("Disassembler", "Uppercase") ? regName.toUpper() : regName, TokenValue()));
+    tokens.push_back(SingleToken(TokenType::ArgumentSpace, ": ", TokenValue()));
+    tokens.push_back(SingleToken(TokenType::Value, ToHexString(oldValue), TokenValue(8, oldValue)));
+    tokens.push_back(SingleToken(TokenType::ArgumentSpace, "-> ", TokenValue()));
+    tokens.push_back(SingleToken(TokenType::Value, ToHexString(newValue), TokenValue(8, newValue)));
+}
+
+void ZydisTokenizer::TokenizeTraceMemory(duint address, duint oldValue, duint newValue, std::vector<SingleToken> & tokens)
+{
+    if(tokens.size() > 0)
+    {
+        tokens.push_back(SingleToken(TokenType::ArgumentSpace, " ", TokenValue()));
+    }
+    tokens.push_back(SingleToken(TokenType::Address, ToPtrString(address), TokenValue(8, address)));
+    tokens.push_back(SingleToken(TokenType::ArgumentSpace, ": ", TokenValue()));
+    tokens.push_back(SingleToken(TokenType::Value, ToHexString(oldValue), TokenValue(8, oldValue)));
+    tokens.push_back(SingleToken(TokenType::ArgumentSpace, "-> ", TokenValue()));
+    tokens.push_back(SingleToken(TokenType::Value, ToHexString(newValue), TokenValue(8, newValue)));
+}
+
 void ZydisTokenizer::UpdateConfig()
 {
     SetConfig(ConfigBool("Disassembler", "Uppercase"),
@@ -210,19 +237,27 @@ const Zydis & ZydisTokenizer::GetZydis() const
 void ZydisTokenizer::TokenToRichText(const InstructionToken & instr, RichTextPainter::List & richTextList, const SingleToken* highlightToken)
 {
     QColor highlightColor = ConfigColor("InstructionHighlightColor");
+    QColor highlightBackgroundColor = ConfigColor("InstructionHighlightBackgroundColor");
     for(const auto & token : instr.tokens)
     {
         RichTextPainter::CustomRichText_t richText;
-        richText.highlight = TokenEquals(&token, highlightToken);
-        richText.highlightColor = highlightColor;
         richText.flags = RichTextPainter::FlagNone;
         richText.text = token.text;
+        richText.underline = false;
         if(token.type < TokenType::Last)
         {
             const auto & tokenColor = colorNamesMap[int(token.type)];
             richText.flags = tokenColor.flags;
-            richText.textColor = tokenColor.color;
-            richText.textBackground = tokenColor.backgroundColor;
+            if(TokenEquals(&token, highlightToken))
+            {
+                richText.textColor = highlightColor;
+                richText.textBackground = highlightBackgroundColor;
+            }
+            else
+            {
+                richText.textColor = tokenColor.color;
+                richText.textBackground = tokenColor.backgroundColor;
+            }
         }
         richTextList.push_back(richText);
     }
@@ -411,6 +446,8 @@ bool ZydisTokenizer::tokenizeMnemonic()
         _mnemonicType = TokenType::MnemonicNop;
     else if(_cp.IsInt3())
         _mnemonicType = TokenType::MnemonicInt3;
+    else if(_cp.IsUnusual())
+        _mnemonicType = TokenType::MnemonicUnusual;
     else if(_cp.IsBranchType(Zydis::BTCallSem))
         _mnemonicType = TokenType::MnemonicCall;
     else if(_cp.IsBranchType(Zydis::BTCondJmpSem))
@@ -421,8 +458,6 @@ bool ZydisTokenizer::tokenizeMnemonic()
         _mnemonicType = TokenType::MnemonicRet;
     else if(_cp.IsPushPop())
         _mnemonicType = TokenType::MnemonicPushPop;
-    else if(_cp.IsUnusual())
-        _mnemonicType = TokenType::MnemonicUnusual;
 
     return tokenizeMnemonic(_mnemonicType, mnemonic);
 }

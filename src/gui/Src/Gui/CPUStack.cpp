@@ -208,7 +208,7 @@ void CPUStack::setupContextMenu()
 
     //Follow CSP
     mMenuBuilder->addAction(makeShortcutAction(DIcon("neworigin.png"), ArchValue(tr("Follow E&SP"), tr("Follow R&SP")), SLOT(gotoCspSlot()), "ActionGotoOrigin"));
-    mMenuBuilder->addAction(makeAction(DIcon("cbp.png"), ArchValue(tr("Follow E&BP"), tr("Follow R&BP")), SLOT(gotoCbpSlot())), [this](QMenu*)
+    mMenuBuilder->addAction(makeShortcutAction(DIcon("cbp.png"), ArchValue(tr("Follow E&BP"), tr("Follow R&BP")), SLOT(gotoCbpSlot()), "ActionGotoCBP"), [this](QMenu*)
     {
         return DbgMemIsValidReadPtr(DbgValFromString("cbp"));
     });
@@ -339,7 +339,7 @@ void CPUStack::getColumnRichText(int col, dsint rva, RichTextPainter::List & ric
 
     STACK_COMMENT comment;
     RichTextPainter::CustomRichText_t curData;
-    curData.highlight = false;
+    curData.underline = false;
     curData.flags = RichTextPainter::FlagColor;
     curData.textColor = mTextColor;
 
@@ -400,7 +400,8 @@ QString CPUStack::paintContent(QPainter* painter, dsint rowBase, int rowOffset, 
     if(col == 0) // paint stack address
     {
         QColor background;
-        if(DbgGetLabelAt(wVa, SEG_DEFAULT, nullptr)) //label
+        char labelText[MAX_LABEL_SIZE] = "";
+        if(DbgGetLabelAt(wVa, SEG_DEFAULT, labelText)) //label
         {
             if(wVa == mCsp) //CSP
             {
@@ -466,7 +467,7 @@ QString CPUStack::paintContent(QPainter* painter, dsint rowBase, int rowOffset, 
                     int width = 5;
                     int offset = 2;
                     auto result = HexDump::paintContent(painter, rowBase, rowOffset, 1, x + (width - 2), y, w - (width - 2), h);
-                    if(party == 0)
+                    if(party == mod_user)
                         painter->setPen(QPen(mUserStackFrameColor, 2));
                     else
                         painter->setPen(QPen(mSystemStackFrameColor, 2));
@@ -529,9 +530,18 @@ void CPUStack::mouseDoubleClickEvent(QMouseEvent* event)
     }
     break;
 
-    default:
+    case 1: // value
     {
         modifySlot();
+    }
+    break;
+
+    default:
+    {
+        duint wVa = rvaToVa(getInitialSelection());
+        STACK_COMMENT comment;
+        if(DbgStackCommentGet(wVa, &comment) && strcmp(comment.color, "!rtnclr") == 0)
+            followDisasmSlot();
     }
     break;
     }

@@ -99,7 +99,7 @@ public:
         {
             RichTextPainter::List richText;
             RichTextPainter::CustomRichText_t rt;
-            rt.highlight = false;
+            rt.underline = false;
             rt.text = text;
             rt.textColor = color;
             rt.textBackground = background;
@@ -258,6 +258,11 @@ public:
 
     VaHistory mHistory;
 
+signals:
+    void selectionChanged(dsint parVA);
+    void displayLogWidget();
+    void detachGraph();
+
 public slots:
     void loadGraphSlot(BridgeCFGraphList* graph, duint addr);
     void graphAtSlot(duint addr);
@@ -282,7 +287,9 @@ public slots:
     void saveImageSlot();
     void setCommentSlot();
     void setLabelSlot();
+    void setBookmarkSlot();
     void xrefSlot();
+    void mnemonicHelpSlot();
     void fitToWindowSlot();
     void zoomToCursorSlot();
     void getCurrentGraphSlot(BridgeCFGraphList* graphList);
@@ -367,6 +374,7 @@ private:
     QColor mCipColor;
     QColor mBreakpointColor;
     QColor mDisabledBreakpointColor;
+    QColor mBookmarkBackgroundColor;
     QColor graphNodeColor;
     QColor graphNodeBackgroundColor;
     QColor graphCurrentShadowColor;

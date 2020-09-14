@@ -52,6 +52,7 @@
 #include "AboutDialog.h"
 #include "UpdateChecker.h"
 #include "Tracer/TraceBrowser.h"
+#include "Tracer/TraceWidget.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -84,6 +85,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(Bridge::getBridge(), SIGNAL(setNameMenuEntry(int, QString)), this, SLOT(setNameMenuEntry(int, QString)));
     connect(Bridge::getBridge(), SIGNAL(setNameMenu(int, QString)), this, SLOT(setNameMenu(int, QString)));
     connect(Bridge::getBridge(), SIGNAL(showCpu()), this, SLOT(displayCpuWidget()));
+    connect(Bridge::getBridge(), SIGNAL(showReferences()), this, SLOT(displayReferencesWidget()));
     connect(Bridge::getBridge(), SIGNAL(addQWidgetTab(QWidget*)), this, SLOT(addQWidgetTab(QWidget*)));
     connect(Bridge::getBridge(), SIGNAL(showQWidgetTab(QWidget*)), this, SLOT(showQWidgetTab(QWidget*)));
     connect(Bridge::getBridge(), SIGNAL(closeQWidgetTab(QWidget*)), this, SLOT(closeQWidgetTab(QWidget*)));
@@ -200,22 +202,17 @@ MainWindow::MainWindow(QWidget* parent)
     mHandlesView->setWindowTitle(tr("Handles"));
     mHandlesView->setWindowIcon(DIcon("handles.png"));
 
-    // Graph view
-    mGraphView = new DisassemblerGraphView(this);
-    mGraphView->setWindowTitle(tr("Graph"));
-    mGraphView->setWindowIcon(DIcon("graph.png"));
-
     // Trace view
-    mTraceBrowser = new TraceBrowser(this);
-    mTraceBrowser->setWindowTitle(tr("Trace"));
-    mTraceBrowser->setWindowIcon(DIcon("trace.png"));
-    connect(mTraceBrowser, SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
+    mTraceWidget = new TraceWidget(this);
+    mTraceWidget->setWindowTitle(tr("Trace"));
+    mTraceWidget->setWindowIcon(DIcon("trace.png"));
+    connect(mTraceWidget->getTraceBrowser(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
+    connect(mTraceWidget->getTraceBrowser(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
 
     mTabWidget = new MHTabWidget(this, true, true);
 
     // Add all widgets to the list
     mWidgetList.push_back(WidgetInfo(mCpuWidget, "CPUTab"));
-    mWidgetList.push_back(WidgetInfo(mGraphView, "GraphTab"));
     mWidgetList.push_back(WidgetInfo(mLogView, "LogTab"));
     mWidgetList.push_back(WidgetInfo(mNotesManager, "NotesTab"));
     mWidgetList.push_back(WidgetInfo(mBreakpointsView, "BreakpointsTab"));
@@ -228,7 +225,7 @@ MainWindow::MainWindow(QWidget* parent)
     mWidgetList.push_back(WidgetInfo(mReferenceManager, "ReferencesTab"));
     mWidgetList.push_back(WidgetInfo(mThreadView, "ThreadsTab"));
     mWidgetList.push_back(WidgetInfo(mHandlesView, "HandlesTab"));
-    mWidgetList.push_back(WidgetInfo(mTraceBrowser, "TraceTab"));
+    mWidgetList.push_back(WidgetInfo(mTraceWidget, "TraceTab"));
 
     // If LoadSaveTabOrder disabled, load tabs in default order
     if(!ConfigBool("Gui", "LoadSaveTabOrder"))
@@ -337,10 +334,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displaySourceManagerWidget()), this, SLOT(displaySourceViewWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
-    connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayGraphWidget()), this, SLOT(displayGraphWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displaySymbolsWidget()), this, SLOT(displaySymbolWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(showPatches()), this, SLOT(patchWindow()));
-
+    connect(mCpuWidget->getGraphWidget(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
 
     connect(mCpuWidget->getDumpWidget(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
 
@@ -349,12 +345,10 @@ MainWindow::MainWindow(QWidget* parent)
     connect(mTabWidget, SIGNAL(tabMovedTabWidget(int, int)), this, SLOT(tabMovedSlot(int, int)));
     connect(Config(), SIGNAL(shortcutsUpdated()), this, SLOT(refreshShortcuts()));
 
-    // Setup favourite tools menu
+    // Menu stuff
     updateFavouriteTools();
-
-    // Setup language menu
     setupLanguagesMenu();
-
+    setupThemesMenu();
     setupMenuCustomization();
 
     // Set default setttings (when not set)
@@ -426,6 +420,100 @@ void MainWindow::setupLanguagesMenu()
     languageMenu->addAction(action_enUS);
     connect(languageMenu, SIGNAL(aboutToShow()), this, SLOT(setupLanguagesMenu2())); //Load this menu later, since it requires directory scanning.
     ui->menuOptions->addMenu(languageMenu);
+}
+
+#include "../src/bridge/Utf8Ini.h"
+
+static void importSettings(const QString & filename, const QSet<QString> & sectionWhitelist = {})
+{
+    QFile f(QDir::toNativeSeparators(filename));
+    if(f.open(QFile::ReadOnly | QFile::Text))
+    {
+        QTextStream in(&f);
+        auto style = in.readAll();
+        f.close();
+        Utf8Ini ini;
+        int errorLine;
+        if(ini.Deserialize(style.toStdString(), errorLine))
+        {
+            auto sections = ini.Sections();
+            for(const auto & section : sections)
+            {
+                if(!sectionWhitelist.isEmpty() && !sectionWhitelist.contains(QString::fromStdString(section)))
+                    continue;
+
+                auto keys = ini.Keys(section);
+                for(const auto & key : keys)
+                    BridgeSettingSet(section.c_str(), key.c_str(), ini.GetValue(section, key).c_str());
+            }
+            Config()->load();
+            DbgSettingsUpdated();
+            emit Config()->colorsUpdated();
+            emit Config()->fontsUpdated();
+            emit Config()->guiOptionsUpdated();
+            emit Config()->shortcutsUpdated();
+            emit Config()->tokenizerConfigUpdated();
+            GuiUpdateAllViews();
+        }
+    }
+}
+
+void MainWindow::loadSelectedStyle(bool reloadStyleCss)
+{
+    char selectedTheme[MAX_SETTING_SIZE] = "";
+    QString stylePath(":/css/default.css");
+    QString styleSettings;
+    if(BridgeSettingGet("Theme", "Selected", selectedTheme) && *selectedTheme)
+    {
+        QString themePath = QString("%1/../themes/%2/style.css").arg(QCoreApplication::applicationDirPath()).arg(selectedTheme);
+        if(QFile(themePath).exists())
+            stylePath = themePath;
+        QString settingsPath = QString("%1/../themes/%2/style.ini").arg(QCoreApplication::applicationDirPath()).arg(selectedTheme);
+        if(QFile(themePath).exists())
+            styleSettings = settingsPath;
+    }
+    QFile f(stylePath);
+    if(f.open(QFile::ReadOnly | QFile::Text))
+    {
+        QTextStream in(&f);
+        auto style = in.readAll();
+        f.close();
+        style = style.replace("url(./", QString("url(../themes/%2/").arg(selectedTheme));
+        qApp->setStyleSheet(style);
+    }
+    if(!reloadStyleCss && !styleSettings.isEmpty())
+        importSettings(styleSettings, { "Colors", "Fonts" });
+}
+
+void MainWindow::themeTriggeredSlot()
+{
+    QAction* action = qobject_cast<QAction*>(sender());
+    if(action == nullptr)
+        return;
+    QString dir = action->data().toString();
+    int nameIdx = dir.lastIndexOf('/');
+    QString name = dir.mid(nameIdx + 1);
+    BridgeSettingSet("Theme", "Selected", name.toUtf8().constData());
+    loadSelectedStyle();
+}
+
+void MainWindow::setupThemesMenu()
+{
+    auto exists = [](const QString & str)
+    {
+        return QFile(str).exists();
+    };
+    QDirIterator it(QString("%1/../themes").arg(QCoreApplication::applicationDirPath()), QDir::NoDotAndDotDot | QDir::Dirs);
+    while(it.hasNext())
+    {
+        auto dir = it.next();
+        auto nameIdx = dir.lastIndexOf('/');
+        auto name = dir.mid(nameIdx + 1);
+        auto action = ui->menuTheme->addAction(name);
+        connect(action, SIGNAL(triggered()), this, SLOT(themeTriggeredSlot()));
+        action->setText(name);
+        action->setData(dir);
+    }
 }
 
 void MainWindow::setupLanguagesMenu2()
@@ -968,6 +1056,7 @@ void MainWindow::updateWindowTitleSlot(QString filename)
 void MainWindow::displayCpuWidget()
 {
     showQWidgetTab(mCpuWidget);
+    mCpuWidget->setDisasmFocus();
 }
 
 void MainWindow::displaySymbolWidget()
@@ -992,7 +1081,8 @@ void MainWindow::displayThreadsWidget()
 
 void MainWindow::displayGraphWidget()
 {
-    showQWidgetTab(mGraphView);
+    showQWidgetTab(mCpuWidget);
+    mCpuWidget->setGraphFocus();
 }
 
 void MainWindow::displayPreviousTab()
@@ -1420,7 +1510,7 @@ void MainWindow::setNameMenu(int hMenu, QString name)
 void MainWindow::runSelection()
 {
     if(DbgIsDebugging())
-        DbgCmdExec(("run " + ToPtrString(mGraphView->hasFocus() ? mGraphView->get_cursor_pos() : mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+        DbgCmdExec(("run " + ToPtrString(mCpuWidget->getSelectionVa())).toUtf8().constData());
 }
 
 void MainWindow::runExpression()
@@ -1504,7 +1594,7 @@ void MainWindow::displaySEHChain()
 
 void MainWindow::displayRunTrace()
 {
-    showQWidgetTab(mTraceBrowser);
+    showQWidgetTab(mTraceWidget);
 }
 
 void MainWindow::donate()
@@ -1678,6 +1768,8 @@ void MainWindow::executeOnGuiThread(void* cbGuiThread, void* userdata)
 
 void MainWindow::tabMovedSlot(int from, int to)
 {
+    Q_UNUSED(from);
+    Q_UNUSED(to);
     for(int i = 0; i < mTabWidget->count(); i++)
     {
         // Remove space in widget name and append Tab to get config settings (CPUTab, MemoryMapTab, etc...)
@@ -1713,16 +1805,7 @@ void MainWindow::on_actionFaq_triggered()
 
 void MainWindow::on_actionReloadStylesheet_triggered()
 {
-    QFile f(QString("%1/style.css").arg(QCoreApplication::applicationDirPath()));
-    if(f.open(QFile::ReadOnly | QFile::Text))
-    {
-        QTextStream in(&f);
-        auto style = in.readAll();
-        f.close();
-        qApp->setStyleSheet(style);
-    }
-    else
-        qApp->setStyleSheet("");
+    loadSelectedStyle(true);
     ensurePolished();
     update();
 }
@@ -2050,39 +2133,12 @@ void MainWindow::customizeMenu()
     onMenuCustomized();
 }
 
-#include "../src/bridge/Utf8Ini.h"
-
 void MainWindow::on_actionImportSettings_triggered()
 {
     auto filename = QFileDialog::getOpenFileName(this, tr("Open file"), QCoreApplication::applicationDirPath(), tr("Settings (*.ini);;All files (*.*)"));
     if(!filename.length())
         return;
-    QFile f(QDir::toNativeSeparators(filename));
-    if(f.open(QFile::ReadOnly | QFile::Text))
-    {
-        QTextStream in(&f);
-        auto style = in.readAll();
-        f.close();
-        Utf8Ini ini;
-        int errorLine;
-        if(ini.Deserialize(style.toStdString(), errorLine))
-        {
-            auto sections = ini.Sections();
-            for(const auto & section : sections)
-            {
-                auto keys = ini.Keys(section);
-                for(const auto & key : keys)
-                    BridgeSettingSet(section.c_str(), key.c_str(), ini.GetValue(section, key).c_str());
-            }
-            Config()->load();
-            DbgSettingsUpdated();
-            emit Config()->colorsUpdated();
-            emit Config()->fontsUpdated();
-            emit Config()->shortcutsUpdated();
-            emit Config()->tokenizerConfigUpdated();
-            GuiUpdateAllViews();
-        }
-    }
+    importSettings(filename);
 }
 
 void MainWindow::on_actionImportdatabase_triggered()
@@ -2199,4 +2255,20 @@ void MainWindow::on_actionPlugins_triggered()
 void MainWindow::on_actionCheckUpdates_triggered()
 {
     mUpdateChecker->checkForUpdates();
+}
+
+void MainWindow::on_actionDefaultTheme_triggered()
+{
+    // Delete [Theme] Selected
+    BridgeSettingSet("Theme", "Selected", nullptr);
+    // Load style
+    loadSelectedStyle();
+    // Reset [Colors] to default
+    Config()->Colors = Config()->defaultColors;
+    Config()->writeColors();
+    // Reset [Fonts] to default
+    //Config()->Fonts = Config()->defaultFonts;
+    //Config()->writeFonts();
+    // Remove custom colors
+    BridgeSettingSet("Colors", "CustomColorCount", nullptr);
 }

@@ -116,7 +116,7 @@ struct MODINFO
     HANDLE fileMap = nullptr;
     ULONG_PTR fileMapVA = 0;
 
-    int party;  // Party. Currently used value: 0: User, 1: System
+    MODULEPARTY party;  // Party. Currently used value: 0: User, 1: System
 
     MODINFO()
     {
@@ -144,6 +144,8 @@ void ModClear();
 MODINFO* ModInfoFromAddr(duint Address);
 bool ModNameFromAddr(duint Address, char* Name, bool Extension);
 duint ModBaseFromAddr(duint Address);
+// Get a unique hash for an address in the module.
+// IMPORTANT: If you want to get a hash for the module base, pass the base
 duint ModHashFromAddr(duint Address);
 duint ModHashFromName(const char* Module);
 duint ModContentHashFromAddr(duint Address);
@@ -162,8 +164,8 @@ int ModPathFromName(const char* Module, char* Path, int Size);
 /// <param name="cbEnum">Enumeration function.</param>
 void ModEnum(const std::function<void(const MODINFO &)> & cbEnum);
 
-int ModGetParty(duint Address);
-void ModSetParty(duint Address, int Party);
+MODULEPARTY ModGetParty(duint Address);
+void ModSetParty(duint Address, MODULEPARTY Party);
 bool ModRelocationsFromAddr(duint Address, std::vector<MODRELOCATIONINFO> & Relocations);
 bool ModRelocationAtAddr(duint Address, MODRELOCATIONINFO* Relocation);
 bool ModRelocationsInRange(duint Address, duint Size, std::vector<MODRELOCATIONINFO> & Relocations);

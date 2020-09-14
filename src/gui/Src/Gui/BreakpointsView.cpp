@@ -67,7 +67,7 @@ void BreakpointsView::setupContextMenu()
         }
         return true;
     });
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("breakpoint_edit_alt.png"), tr("&Edit"), SLOT(editBreakpointSlot()), "ActionBinaryEdit"), validBp);
+    mMenuBuilder->addAction(makeShortcutAction(DIcon("breakpoint_edit_alt.png"), tr("&Edit"), SLOT(editBreakpointSlot()), "ActionEditBreakpoint"), validBp);
     mMenuBuilder->addAction(makeShortcutAction(DIcon("breakpoint_reset_hitcount.png"), tr("Reset hit count"), SLOT(resetHitCountBreakpointSlot()), "ActionResetHitCountBreakpoint"), [this](QMenu*)
     {
         if(!isValidBp())
@@ -294,7 +294,7 @@ void BreakpointsView::updateBreakpointsSlot()
             auto colored = [&richSummary](QString text, QColor color)
             {
                 RichTextPainter::CustomRichText_t token;
-                token.highlight = false;
+                token.underline = false;
                 token.flags = RichTextPainter::FlagColor;
                 token.textColor = color;
                 token.text = text;
@@ -303,7 +303,7 @@ void BreakpointsView::updateBreakpointsSlot()
             auto text = [this, &richSummary](QString text)
             {
                 RichTextPainter::CustomRichText_t token;
-                token.highlight = false;
+                token.underline = false;
                 token.flags = RichTextPainter::FlagColor;
                 token.textColor = this->mTextColor;
                 token.text = text;

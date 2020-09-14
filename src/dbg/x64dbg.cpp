@@ -403,6 +403,7 @@ static void registercommands()
     dbgcmdnew("AddFavouriteToolShortcut,SetFavouriteToolShortcut", cbInstrSetFavToolShortcut, false); //set favourite tool shortcut
     dbgcmdnew("FoldDisassembly", cbInstrFoldDisassembly, true); //fold disassembly segment
     dbgcmdnew("guiupdatetitle", cbDebugUpdateTitle, true); // set relevant disassembly title
+    dbgcmdnew("showref", cbShowReferences, false); // show references window
 
     //misc
     dbgcmdnew("chd", cbInstrChd, false); //Change directory
@@ -442,6 +443,7 @@ static void registercommands()
     dbgcmdnew("printstack,logstack", cbInstrPrintStack, true); //print the call stack
     dbgcmdnew("flushlog", cbInstrFlushlog, false); //flush the log
     dbgcmdnew("AnimateWait", cbInstrAnimateWait, true); //Wait for the debuggee to pause.
+    dbgcmdnew("dbdecompress", cbInstrDbdecompress, false); //Decompress a database.
 };
 
 bool cbCommandProvider(char* cmd, int maxlen)
@@ -615,21 +617,80 @@ static WString escape(WString cmdline)
     return cmdline;
 }
 
+#include <delayimp.h>
+
+// https://devblogs.microsoft.com/oldnewthing/20170126-00/?p=95265
+static FARPROC WINAPI delayHook(unsigned dliNotify, PDelayLoadInfo pdli)
+{
+    if(dliNotify == dliNotePreLoadLibrary && _stricmp(pdli->szDll, "TitanEngine.dll") == 0)
+    {
+        enum DebugEngine : duint
+        {
+            TitanEngine,
+            GleeBug,
+            StaticEngine,
+        };
+
+        static DebugEngine debugEngine = []
+        {
+            duint setting = TitanEngine;
+            if(!BridgeSettingGetUint("Engine", "DebugEngine", &setting))
+            {
+                auto msg = String(GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "GleeBug is now available for beta testing, would you like to enable it? Some bugs can be expected, but generally things are looking stable!\n\nYou can change this setting in the Settings dialog.")));
+                auto title = String(GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "New debug engine available!")));
+                if(MessageBoxW(GuiGetWindowHandle(), StringUtils::Utf8ToUtf16(msg).c_str(), StringUtils::Utf8ToUtf16(title).c_str(), MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
+                    setting = GleeBug;
+                BridgeSettingSetUint("Engine", "DebugEngine", setting);
+            }
+            return (DebugEngine)setting;
+        }();
+
+        String fullPath = szProgramDir;
+        fullPath += '\\';
+
+        switch(debugEngine)
+        {
+        case GleeBug:
+            fullPath += "GleeBug\\TitanEngine.dll";
+            break;
+        case StaticEngine:
+            fullPath += "StaticEngine\\TitanEngine.dll";
+            break;
+        case TitanEngine:
+        default:
+            return 0;
+        }
+
+        auto hModule = LoadLibraryW(StringUtils::Utf8ToUtf16(fullPath).c_str());
+        if(hModule)
+        {
+            dprintf(QT_TRANSLATE_NOOP("DBG", "Successfully loaded %s!\n"), fullPath.c_str());
+        }
+        else
+        {
+            dprintf(QT_TRANSLATE_NOOP("DBG", "Failed to load %s, falling back to regular TitanEngine.dll"), fullPath.c_str());
+        }
+        return (FARPROC)hModule;
+    }
+
+    return 0;
+}
+
+PfnDliHook __pfnDliNotifyHook2 = delayHook;
+
 extern "C" DLL_EXPORT const char* _dbg_dbginit()
 {
+    if(!*szProgramDir)
+        return "GetModuleFileNameW failed!";
+
     if(!EngineCheckStructAlignment(UE_STRUCT_TITAN_ENGINE_CONTEXT, sizeof(TITAN_ENGINE_CONTEXT_t)))
         return "Invalid TITAN_ENGINE_CONTEXT_t alignment!";
 
     static_assert(sizeof(TITAN_ENGINE_CONTEXT_t) == sizeof(REGISTERCONTEXT), "Invalid REGISTERCONTEXT alignment!");
 
-    wchar_t wszDir[deflen] = L"";
-    if(!GetModuleFileNameW(hInst, wszDir, deflen))
-        return "GetModuleFileNameW failed!";
-    strcpy_s(szProgramDir, StringUtils::Utf16ToUtf8(wszDir).c_str());
-    int len = (int)strlen(szProgramDir);
-    while(szProgramDir[len] != '\\')
-        len--;
-    szProgramDir[len] = 0;
+    strcpy_s(szDllLoaderPath, szProgramDir);
+    strcat_s(szDllLoaderPath, "\\loaddll.exe");
+
 #ifdef ENABLE_MEM_TRACE
     strcpy_s(alloctrace, szProgramDir);
     strcat_s(alloctrace, "\\alloctrace.txt");

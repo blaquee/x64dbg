@@ -421,7 +421,9 @@ typedef enum
     size_byte = 1,
     size_word = 2,
     size_dword = 4,
-    size_qword = 8
+    size_qword = 8,
+    size_xmmword = 16,
+    size_ymmword = 32
 } MEMORY_SIZE;
 
 typedef enum
@@ -510,6 +512,12 @@ typedef enum
     sym_export,
     sym_symbol
 } SYMBOLTYPE;
+
+typedef enum
+{
+    mod_user,
+    mod_system
+} MODULEPARTY;
 
 //Debugger typedefs
 typedef MEMORY_SIZE VALUE_SIZE;
@@ -1179,6 +1187,7 @@ typedef enum
     GUI_UPDATE_TRACE_BROWSER,       // param1=unused,               param2=unused
     GUI_INVALIDATE_SYMBOL_SOURCE,   // param1=duint base,           param2=unused
     GUI_GET_CURRENT_GRAPH,          // param1=BridgeCFGraphList*,   param2=unused
+    GUI_SHOW_REF,                   // param1=unused,               param2=unused
 } GUIMSG;
 
 //GUI Typedefs
@@ -1359,6 +1368,7 @@ BRIDGE_IMPEXP void GuiOpenTraceFile(const char* fileName);
 BRIDGE_IMPEXP void GuiInvalidateSymbolSource(duint base);
 BRIDGE_IMPEXP void GuiExecuteOnGuiThreadEx(GUICALLBACKEX cbGuiThread, void* userdata);
 BRIDGE_IMPEXP void GuiGetCurrentGraph(BridgeCFGraphList* graphList);
+BRIDGE_IMPEXP void GuiShowReferences();
 
 #ifdef __cplusplus
 }

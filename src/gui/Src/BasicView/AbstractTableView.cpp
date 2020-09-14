@@ -5,7 +5,6 @@
 #include "CachedFontMetrics.h"
 #include "Bridge.h"
 #include "DisassemblyPopup.h"
-#include <windows.h>
 #include "MethodInvoker.h"
 
 int AbstractTableView::mMouseWheelScrollDelta = 0;
@@ -47,7 +46,7 @@ AbstractTableView::AbstractTableView(QWidget* parent)
 
     mRowCount = 0;
 
-    mHeaderButtonSytle.setStyleSheet(" QPushButton {\n     background-color: rgb(192, 192, 192);\n     border-style: outset;\n     border-width: 2px;\n     border-color: rgb(128, 128, 128);\n }\n QPushButton:pressed {\n     background-color: rgb(192, 192, 192);\n     border-style: inset;\n }");
+    mHeaderButtonSytle.setObjectName("AbstractTableViewHeader");
 
     mNbrOfLineToPrint = 0;
 
@@ -58,6 +57,8 @@ AbstractTableView::AbstractTableView(QWidget* parent)
     mShouldReload = true;
     mAllowPainting = true;
     mDrawDebugOnly = false;
+    mPopupEnabled = true;
+    mPopupTimer = 0;
 
     // ScrollBar Init
     setVerticalScrollBar(new AbstractTableScrollBar(verticalScrollBar()));
@@ -66,28 +67,7 @@ AbstractTableView::AbstractTableView(QWidget* parent)
     horizontalScrollBar()->setRange(0, 0);
     horizontalScrollBar()->setPageStep(650);
     if(mMouseWheelScrollDelta == 0)
-    {
-        //Initialize scroll delta from registry. Windows-specific
-        HKEY hDesktop;
-        if(RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\Desktop\\", 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE, &hDesktop) != ERROR_SUCCESS)
-            mMouseWheelScrollDelta = 4; // Failed to open the registry. Use a default value;
-        else
-        {
-            wchar_t Data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-            DWORD regType = 0;
-            DWORD cbData = sizeof(Data) - sizeof(wchar_t);
-            if(RegQueryValueExW(hDesktop, L"WheelScrollLines", nullptr, &regType, (LPBYTE)&Data, &cbData) == ERROR_SUCCESS)
-            {
-                if(regType == REG_SZ) // Don't process other types of data
-                    mMouseWheelScrollDelta = _wtoi(Data);
-                if(mMouseWheelScrollDelta == 0)
-                    mMouseWheelScrollDelta = 4; // Malformed registry value. Use a default value.
-            }
-            else
-                mMouseWheelScrollDelta = 4; // Failed to query the registry. Use a default value;
-            RegCloseKey(hDesktop);
-        }
-    }
+        mMouseWheelScrollDelta = QApplication::wheelScrollLines();
     setMouseTracking(true);
 
     // Slots
@@ -247,6 +227,7 @@ void AbstractTableView::paintEvent(QPaintEvent* event)
 
     Q_UNUSED(event);
     QPainter wPainter(this->viewport());
+    wPainter.setFont(font());
     int wViewableRowsCount = getViewableRowsCount();
 
     int scrollValue = -horizontalScrollBar()->value();
@@ -1295,6 +1276,12 @@ void AbstractTableView::prepareData()
 /************************************************************************************
                          DisassemblyPopup
 ************************************************************************************/
+
+void AbstractTableView::setDisassemblyPopupEnabled(bool enable)
+{
+    mPopupEnabled = enable;
+}
+
 duint AbstractTableView::getDisassemblyPopupAddress(int mousex, int mousey)
 {
     Q_UNUSED(mousex)
@@ -1304,8 +1291,10 @@ duint AbstractTableView::getDisassemblyPopupAddress(int mousex, int mousey)
 
 void AbstractTableView::ShowDisassemblyPopup(duint addr, int x, int y)
 {
-    if(!addr)
+    if(!mPopupEnabled || !addr)
     {
+        killTimer(mPopupTimer);
+        mPopupTimer = 0;
         if(mDisassemblyPopup)
             mDisassemblyPopup->hide();
         return;
@@ -1318,10 +1307,27 @@ void AbstractTableView::ShowDisassemblyPopup(duint addr, int x, int y)
     {
         mDisassemblyPopup->move(mapToGlobal(QPoint(x + 20, y + fontMetrics().height() * 2)));
         mDisassemblyPopup->setAddress(addr);
-        mDisassemblyPopup->show();
+        //mDisassemblyPopup->show();
+        if(mPopupTimer == 0)
+            mPopupTimer = startTimer(QApplication::startDragTime());
     }
     else
+    {
         mDisassemblyPopup->hide();
+        killTimer(mPopupTimer);
+        mPopupTimer = 0;
+    }
+}
+
+void AbstractTableView::timerEvent(QTimerEvent* event)
+{
+    if(event->timerId() == mPopupTimer)
+    {
+        mDisassemblyPopup->show();
+        killTimer(mPopupTimer);
+        mPopupTimer = 0;
+    }
+    QAbstractScrollArea::timerEvent(event);
 }
 
 void AbstractTableView::hideEvent(QHideEvent* event)

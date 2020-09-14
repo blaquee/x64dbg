@@ -128,7 +128,7 @@ void MemUpdateMap()
             continue;
         if(!bListAllPages) //normal view
         {
-            // sanity check, rest of code assumes whole module resides in one region
+            // coherence check, rest of code assumes whole module resides in one region
             // in other cases module information cannot be trusted
             if(base != modBase || currentPage.mbi.RegionSize != ModSizeFromAddr(modBase))
                 continue;
@@ -175,8 +175,8 @@ void MemUpdateMap()
                 if(start < secEnd && end > secStart) //the section and memory overlap
                 {
                     if(infoOffset)
-                        infoOffset += sprintf_s(currentPage.info + infoOffset, sizeof(currentPage.info) - infoOffset, ",");
-                    infoOffset += sprintf_s(currentPage.info + infoOffset, sizeof(currentPage.info) - infoOffset, " \"%s\"", currentSection.name);
+                        infoOffset += _snprintf_s(currentPage.info + infoOffset, sizeof(currentPage.info) - infoOffset, _TRUNCATE, ",");
+                    infoOffset += _snprintf_s(currentPage.info + infoOffset, sizeof(currentPage.info) - infoOffset, _TRUNCATE, " \"%s\"", currentSection.name);
                 }
             }
         }
@@ -324,7 +324,7 @@ static bool IgnoreThisRead(HANDLE hProcess, LPVOID lpBaseAddress, LPVOID lpBuffe
     if(fnQueryWorkingSetEx(hProcess, &wsi, sizeof(wsi)) && !wsi.VirtualAttributes.Valid)
     {
         MEMORY_BASIC_INFORMATION mbi;
-        if(VirtualQueryEx(hProcess, wsi.VirtualAddress, &mbi, sizeof(mbi)) && mbi.State == MEM_COMMIT && mbi.Type == MEM_PRIVATE)
+        if(VirtualQueryEx(hProcess, wsi.VirtualAddress, &mbi, sizeof(mbi)) && mbi.State == MEM_COMMIT/* && mbi.Type == MEM_PRIVATE*/)
         {
             memset(lpBuffer, 0, nSize);
             if(lpNumberOfBytesRead)
@@ -337,10 +337,12 @@ static bool IgnoreThisRead(HANDLE hProcess, LPVOID lpBaseAddress, LPVOID lpBuffe
 
 bool MemoryReadSafePage(HANDLE hProcess, LPVOID lpBaseAddress, LPVOID lpBuffer, SIZE_T nSize, SIZE_T* lpNumberOfBytesRead)
 {
+#if 0
     //TODO: remove when proven stable, this function checks if reads are always within page boundaries
     auto base = duint(lpBaseAddress);
     if(nSize > PAGE_SIZE - (base & (PAGE_SIZE - 1)))
         __debugbreak();
+#endif
     if(IgnoreThisRead(hProcess, lpBaseAddress, lpBuffer, nSize, lpNumberOfBytesRead))
         return true;
     return MemoryReadSafe(hProcess, lpBaseAddress, lpBuffer, nSize, lpNumberOfBytesRead);

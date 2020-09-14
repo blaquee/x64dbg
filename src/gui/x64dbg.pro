@@ -74,6 +74,9 @@ RESOURCES += \
     resource.qrc
 
 SOURCES += \
+    Src/Gui/CPURegistersView.cpp \
+    Src/Tracer/TraceRegisters.cpp \
+    Src/Tracer/TraceWidget.cpp \
     Src/main.cpp \
     Src/Gui/MainWindow.cpp \
     Src/Gui/CPUWidget.cpp \
@@ -183,10 +186,14 @@ SOURCES += \
     Src/BasicView/AbstractStdTable.cpp \
     Src/Gui/ZehSymbolTable.cpp \
     Src/BasicView/StdSearchListView.cpp \
-    Src/BasicView/StdTableSearchList.cpp
+    Src/BasicView/StdTableSearchList.cpp \
+    Src/Utils/BackgroundFlickerThread.cpp
 
 
 HEADERS += \
+    Src/Gui/CPURegistersView.h \
+    Src/Tracer/TraceRegisters.h \
+    Src/Tracer/TraceWidget.h \
     Src/main.h \
     Src/Gui/MainWindow.h \
     Src/Gui/CPUWidget.h \
@@ -305,7 +312,8 @@ HEADERS += \
     Src/BasicView/StdSearchListView.h \
     Src/Gui/FileLines.h \
     Src/BasicView/StdTableSearchList.h \
-    Src/Utils/MethodInvoker.h
+    Src/Utils/MethodInvoker.h \
+    Src/Utils/BackgroundFlickerThread.h
     
 
 FORMS += \
@@ -343,7 +351,8 @@ FORMS += \
     Src/Gui/SimpleTraceDialog.ui \
     Src/Gui/MessagesBreakpoints.ui \
     Src/Gui/AboutDialog.ui \
-    Src/Gui/ComboBoxDialog.ui
+    Src/Gui/ComboBoxDialog.ui \
+    Src/Tracer/TraceWidget.ui
 
 ##
 ## Libraries

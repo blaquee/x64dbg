@@ -112,6 +112,7 @@ public:
     void setDrawDebugOnly(bool value);
     bool getAllowPainting() const;
     void setAllowPainting(bool allow);
+    void setDisassemblyPopupEnabled(bool enable);
 
     // UI customization
     void loadColumnFromConfig(const QString & viewName);
@@ -145,6 +146,7 @@ public slots:
 
 protected slots:
     void ShowDisassemblyPopup(duint addr, int x, int y); // this should probably be a slot, but doesn't need emit fixes (it's already used correctly)
+    void timerEvent(QTimerEvent* event);
 
 private slots:
     // Configuration
@@ -208,7 +210,9 @@ private:
 
     bool mShouldReload;
     bool mDrawDebugOnly;
+    bool mPopupEnabled;
     bool mAllowPainting;
+    int mPopupTimer;
 
     static int mMouseWheelScrollDelta;
     ScrollBar64 mScrollBarAttributes;

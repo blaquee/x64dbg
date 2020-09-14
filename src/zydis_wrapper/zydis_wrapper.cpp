@@ -560,7 +560,7 @@ bool Zydis::IsNop() const
     case ZYDIS_MNEMONIC_JRCXZ:
     case ZYDIS_MNEMONIC_JS:
     case ZYDIS_MNEMONIC_JZ:
-        // jmp 0
+        // jmp $0
         return ops[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE
                && ops[0].imm.value.u == this->Address() + this->Size();
     case ZYDIS_MNEMONIC_SHL:
@@ -615,7 +615,9 @@ bool Zydis::IsUnusual() const
            || id == ZYDIS_MNEMONIC_RDRAND
            || id == ZYDIS_MNEMONIC_RDSEED
            || id == ZYDIS_MNEMONIC_UD1
-           || id == ZYDIS_MNEMONIC_UD2;
+           || id == ZYDIS_MNEMONIC_UD2
+           || id == ZYDIS_MNEMONIC_VMCALL
+           || id == ZYDIS_MNEMONIC_VMFUNC;
 }
 
 std::string Zydis::Mnemonic() const
@@ -691,6 +693,24 @@ size_t Zydis::ResolveOpValue(int opindex, const std::function<size_t(ZydisRegist
     return dest;
 }
 
+Zydis::VectorElementType Zydis::getVectorElementType(int opindex) const
+{
+    if(!Success())
+        return Zydis::VETDefault;
+    if(opindex >= mInstr.operandCount)
+        return Zydis::VETDefault;
+    const auto & op = mInstr.operands[opindex];
+    switch(op.elementType)
+    {
+    case ZYDIS_ELEMENT_TYPE_FLOAT32:
+        return Zydis::VETFloat32;
+    case ZYDIS_ELEMENT_TYPE_FLOAT64:
+        return Zydis::VETFloat64;
+    default:
+        return Zydis::VETDefault;
+    }
+}
+
 bool Zydis::IsBranchGoingToExecute(size_t cflags, size_t ccx) const
 {
     if(!Success())
@@ -748,11 +768,11 @@ bool Zydis::IsBranchGoingToExecute(ZydisMnemonic id, size_t cflags, size_t ccx)
     case ZYDIS_MNEMONIC_JS: //jump short if sign
         return bSF;
     case ZYDIS_MNEMONIC_LOOP: //decrement count; jump short if ecx!=0
-        return ccx != 0;
+        return ccx != 1;
     case ZYDIS_MNEMONIC_LOOPE: //decrement count; jump short if ecx!=0 and zf=1
-        return ccx != 0 && bZF;
+        return ccx != 1 && bZF;
     case ZYDIS_MNEMONIC_LOOPNE: //decrement count; jump short if ecx!=0 and zf=0
-        return ccx != 0 && !bZF;
+        return ccx != 1 && !bZF;
     default:
         return false;
     }

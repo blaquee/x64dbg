@@ -59,6 +59,7 @@ mkdir %RELEASEDIR%\release\x64
 
 xcopy deps\x32 %RELEASEDIR%\release\x32 /S /Y
 xcopy deps\x64 %RELEASEDIR%\release\x64 /S /Y
+xcopy bin\themes %RELEASEDIR%\release\themes /S /Y /I
 
 copy help\x64dbg.chm %RELEASEDIR%\release\
 copy bin\x96dbg.exe %RELEASEDIR%\release\
@@ -72,12 +73,23 @@ copy bin\x32\x32bridge.dll %RELEASEDIR%\release\x32\
 copy bin\x32\x32dbg.dll %RELEASEDIR%\release\x32\
 copy bin\x32\x32dbg.exe %RELEASEDIR%\release\x32\
 copy bin\x32\x32gui.dll %RELEASEDIR%\release\x32\
+copy bin\x32\loaddll.exe %RELEASEDIR%\release\x32\
 copy bin\x64\x64bridge.dll %RELEASEDIR%\release\x64\
 copy bin\x64\x64dbg.dll %RELEASEDIR%\release\x64\
 copy bin\x64\x64dbg.exe %RELEASEDIR%\release\x64\
 copy bin\x64\x64gui.dll %RELEASEDIR%\release\x64\
+copy bin\x64\loaddll.exe %RELEASEDIR%\release\x64\
 
 echo "creating commithash.txt"
 git rev-parse HEAD > %RELEASEDIR%\commithash.txt
+
+echo "copying PDB files"
+mkdir %RELEASEDIR%\pdb
+mkdir %RELEASEDIR%\pdb\x32
+mkdir %RELEASEDIR%\pdb\x64
+
+copy bin\*.pdb %RELEASEDIR%\pdb\
+copy bin\x32\*.pdb %RELEASEDIR%\pdb\x32\
+copy bin\x64\*.pdb %RELEASEDIR%\pdb\x64\
 
 exit 0

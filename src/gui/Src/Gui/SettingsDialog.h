@@ -57,6 +57,7 @@ private slots:
     void on_chkVerboseExceptionLogging_toggled(bool checked);
     void on_chkNoWow64SingleStepWorkaround_toggled(bool checked);
     void on_spinMaxTraceCount_valueChanged(int arg1);
+    void on_spinAnimateInterval_valueChanged(int arg1);
     //Exception tab
     void on_btnAddRange_clicked();
     void on_btnDeleteRange_clicked();
@@ -73,6 +74,7 @@ private slots:
     void on_chkNoCurrentModuleText_toggled(bool checked);
     void on_chkPermanentHighlightingMode_toggled(bool checked);
     void on_chk0xPrefixValues_toggled(bool checked);
+    void on_chkNoBranchDisasmPreview_toggled(bool checked);
     void on_chkNoSourceLinesAutoComments_toggled(bool checked);
     void on_spinMaximumModuleNameSize_valueChanged(int arg1);
     //Gui Tab
@@ -159,6 +161,7 @@ private:
         bool engineVerboseExceptionLogging;
         bool engineNoWow64SingleStepWorkaround;
         int engineMaxTraceCount;
+        int engineAnimateInterval;
         //Exception Tab
         QList<RangeStruct>* exceptionRanges;
         //Disasm Tab
@@ -173,6 +176,7 @@ private:
         bool disasmNoCurrentModuleText;
         bool disasmPermanentHighlightingMode;
         bool disasm0xPrefixValues;
+        bool disasmNoBranchDisasmPreview;
         bool disasmNoSourceLineAutoComments;
         int disasmMaxModuleSize;
         //Gui Tab
@@ -206,6 +210,7 @@ private:
     QList<RangeStruct> realExceptionRanges;
     bool bJitOld;
     bool bJitAutoOld;
+    bool bGuiOptionsUpdated;
     bool bTokenizerConfigUpdated;
     bool bDisableAutoCompleteUpdated;
     bool bAsciiAddressDumpModeUpdated;

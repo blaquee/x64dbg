@@ -89,6 +89,7 @@ public slots:
     void copyTableToLogSlot();
     void copyTableResizeToLogSlot();
     void copyEntrySlot();
+    void exportTableSlot();
     void contextMenuRequestedSlot(const QPoint & pos);
     void headerButtonPressedSlot(int col);
 
@@ -144,4 +145,12 @@ protected:
     int mAddressColumn = -1;
     bool bAddressLabel = true;
     bool bDisassemblyPopupEnabled = true;
+
+    QAction* mCopyLine;
+    QAction* mCopyTable;
+    QAction* mCopyTableResize;
+    QAction* mCopyLineToLog;
+    QAction* mCopyTableToLog;
+    QAction* mCopyTableResizeToLog;
+    QAction* mExportTableCSV;
 };

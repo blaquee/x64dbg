@@ -21,16 +21,16 @@ static bool skipInt3Stepping(int argc, char* argv[])
 {
     if(!bSkipInt3Stepping || dbgisrunning() || getLastExceptionInfo().ExceptionRecord.ExceptionCode != EXCEPTION_BREAKPOINT)
         return false;
-    duint cip = GetContextDataEx(hActiveThread, UE_CIP);
+    auto exceptionAddress = (duint)getLastExceptionInfo().ExceptionRecord.ExceptionAddress;
     unsigned char data[MAX_DISASM_BUFFER];
-    MemRead(cip, data, sizeof(data));
+    MemRead(exceptionAddress, data, sizeof(data));
     Zydis zydis;
-    if(zydis.Disassemble(cip, data) && zydis.IsInt3())
+    if(zydis.Disassemble(exceptionAddress, data) && zydis.IsInt3())
     {
         //Don't allow skipping of multiple consecutive INT3 instructions
         getLastExceptionInfo().ExceptionRecord.ExceptionCode = 0;
         dputs(QT_TRANSLATE_NOOP("DBG", "Skipped INT3!"));
-        cbDebugSkip(1, argv);
+        cbDebugContinue(1, argv);
         return true;
     }
     return false;
@@ -237,7 +237,7 @@ bool cbDebugAttach(int argc, char* argv[])
 #endif // _WIN64
         return false;
     }
-    if(!GetFileNameFromProcessHandle(hProcess, szFileName))
+    if(!GetFileNameFromProcessHandle(hProcess, szDebuggeePath))
     {
         dprintf(QT_TRANSLATE_NOOP("DBG", "Could not get module filename %X!\n"), DWORD(pid));
         return false;
@@ -320,9 +320,14 @@ bool cbDebugPause(int argc, char* argv[])
         dputs(QT_TRANSLATE_NOOP("DBG", "Program is not running"));
         return false;
     }
-    if(SuspendThread(hActiveThread) == -1)
+    // Interesting behavior found by JustMagic, if the active thread is suspended pause would fail
+    auto previousSuspendCount = SuspendThread(hActiveThread);
+    if(previousSuspendCount != 0)
     {
-        dputs(QT_TRANSLATE_NOOP("DBG", "Error suspending thread"));
+        if(previousSuspendCount != -1)
+            ResumeThread(hActiveThread);
+        dputs(QT_TRANSLATE_NOOP("DBG", "The active thread is suspended, switch to a running thread to pause the process"));
+        // TODO: perhaps inject an INT3 in the process as an alternative to failing?
         return false;
     }
     duint CIP = GetContextDataEx(hActiveThread, UE_CIP);

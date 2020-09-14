@@ -34,10 +34,19 @@ public:
         mSymbolUnloadedTextColor = ConfigColor("SymbolUnloadedTextColor");
         mSymbolLoadingTextColor = ConfigColor("SymbolLoadingTextColor");
         mSymbolLoadedTextColor = ConfigColor("SymbolLoadedTextColor");
+        mSymbolUserTextColor = ConfigColor("SymbolUserTextColor");
+        mSymbolSystemTextColor = ConfigColor("SymbolSystemTextColor");
     }
 
     QColor getCellColor(int r, int c) override
     {
+        if(c == ColParty || c == ColPath)
+        {
+            if(DbgFunctions()->ModGetParty(getCellUserdata(r, ColBase)) != mod_system)
+                return mSymbolUserTextColor;
+            else
+                return mSymbolSystemTextColor;
+        }
         if(c != ColModule && c != ColStatus)
             return mTextColor;
         switch(getStatus(r))
@@ -74,6 +83,8 @@ private:
         return DbgFunctions()->ModSymbolStatus(getCellUserdata(r, 0));
     }
 
+    QColor mSymbolSystemTextColor;
+    QColor mSymbolUserTextColor;
     QColor mSymbolUnloadedTextColor;
     QColor mSymbolLoadingTextColor;
     QColor mSymbolLoadedTextColor;
@@ -391,7 +402,6 @@ void SymbolView::refreshShortcutsSlot()
     mBrowseInExplorer->setShortcut(ConfigShortcut("ActionBrowseInExplorer"));
     mDownloadSymbolsAction->setShortcut(ConfigShortcut("ActionDownloadSymbol"));
     mDownloadAllSymbolsAction->setShortcut(ConfigShortcut("ActionDownloadAllSymbol"));
-    mCopyPathAction->setShortcut(ConfigShortcut("ActionCopy"));
     mFollowInMemMap->setShortcut(ConfigShortcut("ActionFollowMemMap"));
 }
 
@@ -759,7 +769,7 @@ void SymbolView::moduleSetSystem()
 {
     int i = mModuleList->mCurList->getInitialSelection();
     duint modbase = DbgValFromString(mModuleList->mCurList->getCellContent(i, ColBase).toUtf8().constData());
-    DbgFunctions()->ModSetParty(modbase, 1);
+    DbgFunctions()->ModSetParty(modbase, mod_system);
     DbgFunctions()->RefreshModuleList();
 }
 
@@ -767,7 +777,7 @@ void SymbolView::moduleSetUser()
 {
     int i = mModuleList->mCurList->getInitialSelection();
     duint modbase = DbgValFromString(mModuleList->mCurList->getCellContent(i, ColBase).toUtf8().constData());
-    DbgFunctions()->ModSetParty(modbase, 0);
+    DbgFunctions()->ModSetParty(modbase, mod_user);
     DbgFunctions()->RefreshModuleList();
 }
 
@@ -783,9 +793,9 @@ void SymbolView::moduleSetParty()
         bool ok;
         party = mLineEditeditText.toInt(&ok);
         int i = mModuleList->mCurList->getInitialSelection();
-        if(ok)
+        if(ok && (party == mod_user || party == mod_system))
         {
-            DbgFunctions()->ModSetParty(modbase, party);
+            DbgFunctions()->ModSetParty(modbase, (MODULEPARTY)party);
             /* TODO: refresh module list
             switch(party)
             {
@@ -802,7 +812,7 @@ void SymbolView::moduleSetParty()
             mModuleList->mCurList->reloadData();*/
         }
         else
-            SimpleErrorBox(this, tr("Error"), tr("The party number can only be an integer"));
+            SimpleErrorBox(this, tr("Error"), tr("The party number can only be 0 or 1"));
     }
 }
 
