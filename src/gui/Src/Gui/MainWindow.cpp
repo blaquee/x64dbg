@@ -43,7 +43,7 @@
 #include "CPUMultiDump.h"
 #include "CPUStack.h"
 #include "GotoDialog.h"
-#include "BrowseDialog.h"
+#include "SystemBreakpointScriptDialog.h"
 #include "CustomizeMenuDialog.h"
 #include "main.h"
 #include "SimpleTraceDialog.h"
@@ -61,9 +61,25 @@ MainWindow::MainWindow(QWidget* parent)
     ui->setupUi(this);
 
     // Build information
-    QAction* buildInfo = new QAction(ToDateString(GetCompileDate()), this);
-    buildInfo->setEnabled(false);
-    ui->menuBar->addAction(buildInfo);
+    {
+        const char* debugEngine = []
+        {
+            switch(DbgGetDebugEngine())
+            {
+            case DebugEngineTitanEngine:
+                return "TitanEngine";
+            case DebugEngineGleeBug:
+                return "GleeBug";
+            case DebugEngineStaticEngine:
+                return "StaticEngine";
+            }
+            return "";
+        }();
+
+        QAction* buildInfo = new QAction(tr("%1 (%2)").arg(ToDateString(GetCompileDate())).arg(debugEngine), this);
+        buildInfo->setEnabled(false);
+        ui->menuBar->addAction(buildInfo);
+    }
 
     // Setup bridge signals
     connect(Bridge::getBridge(), SIGNAL(updateWindowTitle(QString)), this, SLOT(updateWindowTitleSlot(QString)));
@@ -346,6 +362,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(Config(), SIGNAL(shortcutsUpdated()), this, SLOT(refreshShortcuts()));
 
     // Menu stuff
+    actionManageFavourites = nullptr;
+    mFavouriteToolbar = new QToolBar(tr("Favourite Toolbox"), this);
     updateFavouriteTools();
     setupLanguagesMenu();
     setupThemesMenu();
@@ -728,6 +746,11 @@ void MainWindow::saveWindowSettings()
                              mWidgetList[i].widget->parentWidget()->saveGeometry().toBase64().data());
     }
 
+    // Save favourite toolbar
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarPositionX", mFavouriteToolbar->x());
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarPositionY", mFavouriteToolbar->y());
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarVisible", mFavouriteToolbar->isVisible() ? 1 : 0);
+
     mCpuWidget->saveWindowSettings();
     mSymbolView->saveWindowSettings();
 }
@@ -771,6 +794,14 @@ void MainWindow::loadWindowSettings()
         if(isDeleted)
             mTabWidget->DeleteTab(mTabWidget->indexOf(mWidgetList[i].widget));
     }
+
+    // Load favourite toolbar
+    duint posx = 0, posy = 0, isVisible = 0;
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarPositionX", &posx);
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarPositionY", &posy);
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarVisible", &isVisible);
+    mFavouriteToolbar->move(posx, posy);
+    mFavouriteToolbar->setVisible(isVisible == 1);
 
     mCpuWidget->loadWindowSettings();
     mSymbolView->loadWindowSettings();
@@ -903,7 +934,7 @@ void MainWindow::execCommandSlot()
 {
     QAction* action = qobject_cast<QAction*>(sender());
     if(action)
-        DbgCmdExec(action->data().toString().toUtf8().constData());
+        DbgCmdExec(action->data().toString());
 }
 
 void MainWindow::setFocusToCommandBar()
@@ -989,7 +1020,7 @@ void MainWindow::openFileSlot()
 
 void MainWindow::openRecentFileSlot(QString filename)
 {
-    DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()).toUtf8().constData());
+    DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()));
 }
 
 void MainWindow::runSlot()
@@ -1004,7 +1035,7 @@ void MainWindow::restartDebugging()
 {
     auto last = mMRUList->getEntry(0);
     if(!last.isEmpty())
-        DbgCmdExec(QString("init \"%1\"").arg(last).toUtf8().constData());
+        DbgCmdExec(QString("init \"%1\"").arg(last));
 }
 
 void MainWindow::displayBreakpointWidget()
@@ -1025,7 +1056,7 @@ void MainWindow::dropEvent(QDropEvent* pEvent)
     if(pEvent->mimeData()->hasUrls())
     {
         QString filename = QDir::toNativeSeparators(pEvent->mimeData()->urls()[0].toLocalFile());
-        DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()).toUtf8().constData());
+        DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()));
         pEvent->acceptProposedAction();
     }
 }
@@ -1159,13 +1190,13 @@ void MainWindow::setLastException(unsigned int exceptionCode)
 
 void MainWindow::findStrings()
 {
-    DbgCmdExec(QString("strref " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+    DbgCmdExec(QString("strref " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())));
     displayReferencesWidget();
 }
 
 void MainWindow::findModularCalls()
 {
-    DbgCmdExec(QString("modcallfind " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+    DbgCmdExec(QString("modcallfind " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())));
     displayReferencesWidget();
 }
 
@@ -1510,7 +1541,7 @@ void MainWindow::setNameMenu(int hMenu, QString name)
 void MainWindow::runSelection()
 {
     if(DbgIsDebugging())
-        DbgCmdExec(("run " + ToPtrString(mCpuWidget->getSelectionVa())).toUtf8().constData());
+        DbgCmdExec(("run " + ToPtrString(mCpuWidget->getSelectionVa())));
 }
 
 void MainWindow::runExpression()
@@ -1827,36 +1858,79 @@ void MainWindow::manageFavourites()
     updateFavouriteTools();
 }
 
+static void splitToolPath(const QString & toolPath, QString & file, QString & cmd)
+{
+    if(toolPath.startsWith('\"'))
+    {
+        auto endQuote = toolPath.indexOf('\"', 1);
+        if(endQuote == -1) //"failure with spaces
+            file = toolPath.mid(1);
+        else //"path with spaces" arguments
+        {
+            file = toolPath.mid(1, endQuote - 1);
+            cmd = toolPath.mid(endQuote + 1);
+        }
+    }
+    else
+    {
+        auto firstSpace = toolPath.indexOf(' ');
+        if(firstSpace == -1) //pathwithoutspaces
+            file = toolPath;
+        else //pathwithoutspaces argument
+        {
+            file = toolPath.left(firstSpace);
+            cmd = toolPath.mid(firstSpace + 1);
+        }
+    }
+    file = file.trimmed();
+    cmd = cmd.trimmed();
+}
+
 void MainWindow::updateFavouriteTools()
 {
     char buffer[MAX_SETTING_SIZE];
     bool isanythingexists = false;
     ui->menuFavourites->clear();
+    delete actionManageFavourites;
+    mFavouriteToolbar->clear();
+    actionManageFavourites = new QAction(DIcon("star.png"), tr("&Manage Favourite Tools..."), this);
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Tool%1").arg(i).toUtf8().constData(), buffer); i++)
     {
-        QString exePath = QString(buffer);
-        QAction* newAction = new QAction(this);
-        newAction->setData(QVariant(QString("Tool,%1").arg(exePath)));
+        QString toolPath = QString(buffer);
+        QAction* newAction = new QAction(actionManageFavourites); // Auto delete these actions on updateFavouriteTools()
+        // Set up user data to be used in clickFavouriteTool()
+        newAction->setData(QVariant(QString("Tool,%1").arg(toolPath)));
         if(BridgeSettingGet("Favourite", QString("ToolShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
         if(BridgeSettingGet("Favourite", QString("ToolDescription%1").arg(i).toUtf8().constData(), buffer))
             newAction->setText(QString(buffer));
         else
-            newAction->setText(exePath);
+            newAction->setText(toolPath);
+        // Get the icon of the executable
+        QString file, cmd;
+        QIcon icon;
+        splitToolPath(toolPath, file, cmd);
+        icon = getFileIcon(file);
+        if(icon.isNull())
+            icon = DIcon("plugin.png");
+        newAction->setIcon(icon);
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
     {
         isanythingexists = false;
         ui->menuFavourites->addSeparator();
+        mFavouriteToolbar->addSeparator();
     }
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Script%1").arg(i).toUtf8().constData(), buffer); i++)
     {
         QString scriptPath = QString(buffer);
-        QAction* newAction = new QAction(this);
+        QAction* newAction = new QAction(actionManageFavourites);
+        // Set up user data to be used in clickFavouriteTool()
         newAction->setData(QVariant(QString("Script,%1").arg(scriptPath)));
         if(BridgeSettingGet("Favourite", QString("ScriptShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
@@ -1866,31 +1940,41 @@ void MainWindow::updateFavouriteTools()
         else
             newAction->setText(scriptPath);
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
+        newAction->setIcon(DIcon("script-code.png"));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
     {
         isanythingexists = false;
         ui->menuFavourites->addSeparator();
+        mFavouriteToolbar->addSeparator();
     }
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Command%1").arg(i).toUtf8().constData(), buffer); i++)
     {
-        QAction* newAction = new QAction(QString(buffer), this);
+        QAction* newAction = new QAction(QString(buffer), actionManageFavourites);
+        // Set up user data to be used in clickFavouriteTool()
         newAction->setData(QVariant(QString("Command")));
         if(BridgeSettingGet("Favourite", QString("CommandShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
+        newAction->setIcon(DIcon("star.png"));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
+    {
         ui->menuFavourites->addSeparator();
-    actionManageFavourites = new QAction(DIcon("star.png"), tr("&Manage Favourite Tools..."), this);
+        mFavouriteToolbar->addSeparator();
+    }
     ui->menuFavourites->addAction(actionManageFavourites);
     setGlobalShortcut(actionManageFavourites, ConfigShortcut("FavouritesManage"));
     connect(ui->menuFavourites->actions().last(), SIGNAL(triggered()), this, SLOT(manageFavourites()));
+    mFavouriteToolbar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->menuFavourites->addAction(mFavouriteToolbar->toggleViewAction());
 }
 
 static QString stringFormatInline(const QString & format)
@@ -1941,30 +2025,7 @@ void MainWindow::clickFavouriteTool()
         else if(GetLastError() == ERROR_ELEVATION_REQUIRED)
         {
             QString file, cmd;
-            if(toolPath.startsWith('\"'))
-            {
-                auto endQuote = toolPath.indexOf('\"', 1);
-                if(endQuote == -1) //"failure with spaces
-                    file = toolPath.mid(1);
-                else //"path with spaces" arguments
-                {
-                    file = toolPath.mid(1, endQuote - 1);
-                    cmd = toolPath.mid(endQuote + 1);
-                }
-            }
-            else
-            {
-                auto firstSpace = toolPath.indexOf(' ');
-                if(firstSpace == -1) //pathwithoutspaces
-                    file = toolPath;
-                else //pathwithoutspaces argument
-                {
-                    file = toolPath.left(firstSpace);
-                    cmd = toolPath.mid(firstSpace + 1);
-                }
-            }
-            file = file.trimmed();
-            cmd = cmd.trimmed();
+            splitToolPath(toolPath, file, cmd);
             ShellExecuteW(nullptr, L"runas", file.toStdWString().c_str(), cmd.toStdWString().c_str(), nullptr, SW_SHOWNORMAL);
         }
     }
@@ -1976,7 +2037,7 @@ void MainWindow::clickFavouriteTool()
     }
     else if(data.compare("Command") == 0)
     {
-        DbgCmdExec(action->text().toUtf8().constData());
+        DbgCmdExec(action->text());
     }
 }
 
@@ -2102,26 +2163,8 @@ void MainWindow::animateCommandSlot()
 
 void MainWindow::setInitializationScript()
 {
-    QString global, debuggee;
-    char globalChar[MAX_SETTING_SIZE];
-    if(DbgIsDebugging())
-    {
-        debuggee = QString(DbgFunctions()->DbgGetDebuggeeInitScript());
-        BrowseDialog browseScript(this, tr("Set Initialization Script for Debuggee"), tr("Set Initialization Script for Debuggee"), tr("Script files (*.txt *.scr);;All files (*.*)"), debuggee, false);
-        browseScript.setWindowIcon(DIcon("initscript.png"));
-        if(browseScript.exec() == QDialog::Accepted)
-            DbgFunctions()->DbgSetDebuggeeInitScript(browseScript.path.toUtf8().constData());
-    }
-    if(BridgeSettingGet("Engine", "InitializeScript", globalChar))
-        global = QString(globalChar);
-    else
-        global = QString();
-    BrowseDialog browseScript(this, tr("Set Global Initialization Script"), tr("Set Global Initialization Script"), tr("Script files (*.txt *.scr);;All files (*.*)"), global, false);
-    browseScript.setWindowIcon(DIcon("initscript.png"));
-    if(browseScript.exec() == QDialog::Accepted)
-    {
-        BridgeSettingSet("Engine", "InitializeScript", browseScript.path.toUtf8().constData());
-    }
+    SystemBreakpointScriptDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::customizeMenu()
@@ -2148,7 +2191,7 @@ void MainWindow::on_actionImportdatabase_triggered()
     auto filename = QFileDialog::getOpenFileName(this, tr("Import database"), QString(), tr("Databases (%1);;All files (*.*)").arg(ArchValue("*.dd32", "*.dd64")));
     if(!filename.length())
         return;
-    DbgCmdExec(QString("dbload \"%1\"").arg(QDir::toNativeSeparators(filename)).toUtf8().constData());
+    DbgCmdExec(QString("dbload \"%1\"").arg(QDir::toNativeSeparators(filename)));
 }
 
 void MainWindow::on_actionExportdatabase_triggered()
@@ -2158,7 +2201,7 @@ void MainWindow::on_actionExportdatabase_triggered()
     auto filename = QFileDialog::getSaveFileName(this, tr("Export database"), QString(), tr("Databases (%1);;All files (*.*)").arg(ArchValue("*.dd32", "*.dd64")));
     if(!filename.length())
         return;
-    DbgCmdExec(QString("dbsave \"%1\"").arg(QDir::toNativeSeparators(filename)).toUtf8().constData());
+    DbgCmdExec(QString("dbsave \"%1\"").arg(QDir::toNativeSeparators(filename)));
 }
 
 static void setupMenuCustomizationHelper(QMenu* parentMenu, QList<QAction*> & stringList)

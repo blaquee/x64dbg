@@ -20,10 +20,11 @@ void BreakpointMenu::build(MenuBuilder* builder)
     QAction* removeHwBreakpointAction = makeShortcutAction(DIcon("breakpoint_remove.png"), tr("Remove Hardware"), std::bind(&BreakpointMenu::toggleHwBpActionSlot, this), "ActionRemoveHwBp");
 
     QMenu* replaceSlotMenu = makeMenu(DIcon("breakpoint_execute.png"), tr("Set Hardware on Execution"));
-    QAction* replaceSlot0Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot1.png"), tr("Replace Slot 0 (Free)"), std::bind(&BreakpointMenu::setHwBpOnSlot0ActionSlot, this));
-    QAction* replaceSlot1Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot2.png"), tr("Replace Slot 1 (Free)"), std::bind(&BreakpointMenu::setHwBpOnSlot1ActionSlot, this));
-    QAction* replaceSlot2Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot3.png"), tr("Replace Slot 2 (Free)"), std::bind(&BreakpointMenu::setHwBpOnSlot2ActionSlot, this));
-    QAction* replaceSlot3Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot4.png"), tr("Replace Slot 3 (Free)"), std::bind(&BreakpointMenu::setHwBpOnSlot3ActionSlot, this));
+    // Replacement slot menu are only used when the breakpoints are full, so using "Unknown" as the placeholder. Might want to change this in case we display the menu when there are still free slots.
+    QAction* replaceSlot0Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot1.png"), tr("Replace Slot 0 (Unknown)"), std::bind(&BreakpointMenu::setHwBpOnSlot0ActionSlot, this));
+    QAction* replaceSlot1Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot2.png"), tr("Replace Slot 1 (Unknown)"), std::bind(&BreakpointMenu::setHwBpOnSlot1ActionSlot, this));
+    QAction* replaceSlot2Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot3.png"), tr("Replace Slot 2 (Unknown)"), std::bind(&BreakpointMenu::setHwBpOnSlot2ActionSlot, this));
+    QAction* replaceSlot3Action = makeMenuAction(replaceSlotMenu, DIcon("breakpoint_execute_slot4.png"), tr("Replace Slot 3 (Unknown)"), std::bind(&BreakpointMenu::setHwBpOnSlot3ActionSlot, this));
 
     builder->addMenu(makeMenu(DIcon("breakpoint.png"), tr("Breakpoint")), [ = ](QMenu * menu)
     {
@@ -60,24 +61,27 @@ void BreakpointMenu::build(MenuBuilder* builder)
             }
             else
             {
-                for(int i = 0; i < 4; i++)
+                for(int i = 0; i < bpList.count; i++)
                 {
-                    switch(bpList.bp[i].slot)
+                    if(bpList.bp[i].enabled)
                     {
-                    case 0:
-                        replaceSlot0Action->setText(tr("Replace Slot %1 (0x%2)").arg(1).arg(ToPtrString(bpList.bp[i].addr)));
-                        break;
-                    case 1:
-                        replaceSlot1Action->setText(tr("Replace Slot %1 (0x%2)").arg(2).arg(ToPtrString(bpList.bp[i].addr)));
-                        break;
-                    case 2:
-                        replaceSlot2Action->setText(tr("Replace Slot %1 (0x%2)").arg(3).arg(ToPtrString(bpList.bp[i].addr)));
-                        break;
-                    case 3:
-                        replaceSlot3Action->setText(tr("Replace Slot %1 (0x%2)").arg(4).arg(ToPtrString(bpList.bp[i].addr)));
-                        break;
-                    default:
-                        break;
+                        switch(bpList.bp[i].slot)
+                        {
+                        case 0:
+                            replaceSlot0Action->setText(tr("Replace Slot %1 (0x%2)").arg(1).arg(ToPtrString(bpList.bp[i].addr)));
+                            break;
+                        case 1:
+                            replaceSlot1Action->setText(tr("Replace Slot %1 (0x%2)").arg(2).arg(ToPtrString(bpList.bp[i].addr)));
+                            break;
+                        case 2:
+                            replaceSlot2Action->setText(tr("Replace Slot %1 (0x%2)").arg(3).arg(ToPtrString(bpList.bp[i].addr)));
+                            break;
+                        case 3:
+                            replaceSlot3Action->setText(tr("Replace Slot %1 (0x%2)").arg(4).arg(ToPtrString(bpList.bp[i].addr)));
+                            break;
+                        default:
+                            break;
+                        }
                     }
                 }
                 menu->addMenu(replaceSlotMenu);
@@ -116,7 +120,7 @@ void BreakpointMenu::toggleInt3BPActionSlot()
         wCmd = "bp " + ToPtrString(wVA);
     }
 
-    DbgCmdExec(wCmd.toUtf8().constData());
+    DbgCmdExec(wCmd);
     //emit Disassembly::repainted();
 }
 
@@ -132,7 +136,7 @@ void BreakpointMenu::editSoftBpActionSlot()
         Breakpoints::editBP(bp_normal, ToHexString(selection), dynamic_cast<QWidget*>(parent()));
     else
     {
-        DbgCmdExecDirect(QString("bp %1").arg(ToHexString(selection)).toUtf8().constData()); //Blocking call
+        DbgCmdExecDirect(QString("bp %1").arg(ToHexString(selection))); //Blocking call
         if(!Breakpoints::editBP(bp_normal, ToHexString(selection), dynamic_cast<QWidget*>(parent())))
             Breakpoints::removeBP(bp_normal, selection);
     }
@@ -153,7 +157,7 @@ void BreakpointMenu::toggleHwBpActionSlot()
         wCmd = "bphws " + ToPtrString(wVA);
     }
 
-    DbgCmdExec(wCmd.toUtf8().constData());
+    DbgCmdExec(wCmd);
 }
 
 
@@ -199,17 +203,17 @@ void BreakpointMenu::setHwBpAt(duint va, int slot)
     if(wSlotIndex < 0) // Slot not used
     {
         wCmd = "bphws " + ToPtrString(va);
-        DbgCmdExec(wCmd.toUtf8().constData());
+        DbgCmdExec(wCmd);
     }
     else // Slot used
     {
         wCmd = "bphwc " + ToPtrString((duint)(wBPList.bp[wSlotIndex].addr));
-        DbgCmdExec(wCmd.toUtf8().constData());
+        DbgCmdExec(wCmd);
 
         Sleep(200);
 
         wCmd = "bphws " + ToPtrString(va);
-        DbgCmdExec(wCmd.toUtf8().constData());
+        DbgCmdExec(wCmd);
     }
     if(wBPList.count)
         BridgeFree(wBPList.bp);
