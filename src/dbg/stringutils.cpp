@@ -280,7 +280,7 @@ const String StringUtils::WHITESPACE = " \n\r\t";
 
 String StringUtils::Trim(const String & s, const String & delim)
 {
-    return TrimRight(TrimLeft(s));
+    return TrimRight(TrimLeft(s, delim), delim);
 }
 
 String StringUtils::TrimLeft(const String & s, const String & delim)
@@ -372,6 +372,21 @@ WString StringUtils::LocalCpToUtf16(const char* str)
     {
         convertedString.resize(requiredSize - 1);
         if(!MultiByteToWideChar(CP_ACP, 0, str, -1, (wchar_t*)convertedString.c_str(), requiredSize))
+            convertedString.clear();
+    }
+    return convertedString;
+}
+
+String StringUtils::Utf16ToLocalCp(const WString & str)
+{
+    String convertedString;
+    if(str.size() == 0)
+        return convertedString;
+    int requiredSize = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if(requiredSize > 0)
+    {
+        convertedString.resize(requiredSize - 1);
+        if(!WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, (char*)convertedString.c_str(), requiredSize, nullptr, nullptr))
             convertedString.clear();
     }
     return convertedString;

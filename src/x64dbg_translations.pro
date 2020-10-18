@@ -225,7 +225,11 @@ SOURCES += \
     gui/Src/Gui/MultiItemsSelectWindow.cpp \
     gui/Src/BasicView/AbstractStdTable.cpp \
     gui/Src/Gui/ZehSymbolTable.cpp \
-    gui/Src/BasicView/StdSearchListView.cpp
+    gui/Src/BasicView/StdSearchListView.cpp \
+    gui/Src/Gui/CPURegistersView.cpp \
+    gui/Src/Tracer/TraceRegisters.cpp \
+    gui/Src/Tracer/TraceWidget.cpp \
+    gui/Src/Gui/SystemBreakpointScriptDialog.cpp
 
 HEADERS += \
     gui/Src/Exports.h \
@@ -462,7 +466,11 @@ HEADERS += \
     gui/Src/Gui/MultiItemsSelectWindow.h \
     gui/Src/BasicView/AbstractStdTable.h \
     gui/Src/Gui/ZehSymbolTable.h \
-    gui/Src/BasicView/StdSearchListView.h
+    gui/Src/BasicView/StdSearchListView.h \
+    gui/Src/Gui/CPURegistersView.h \
+    gui/Src/Tracer/TraceRegisters.h \
+    gui/Src/Tracer/TraceWidget.h \
+    gui/Src/Gui/SystemBreakpointScriptDialog.h
 
 FORMS += \
     gui/Src/Gui/AppearanceDialog.ui \
@@ -501,7 +509,9 @@ FORMS += \
     gui/Src/Gui/SimpleTraceDialog.ui \
     gui/Src/Gui/StructWidget.ui \
     gui/Src/Gui/MessagesBreakpoints.ui \
-    gui/Src/Gui/AboutDialog.ui
+    gui/Src/Gui/AboutDialog.ui \
+    gui/Src/Tracer/TraceWidget.ui \
+    gui/Src/Gui/SystemBreakpointScriptDialog.ui
 
 TRANSLATIONS += \
     gui/Translations/x64dbg.ts

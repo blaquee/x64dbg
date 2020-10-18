@@ -36,7 +36,7 @@ UI_DIR = $${X64_GEN_DIR}
 ##
 ## QT libraries
 ##
-QT += core gui network
+QT += core gui network winextras
 
 # QT5 requires widgets
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
@@ -74,6 +74,13 @@ RESOURCES += \
     resource.qrc
 
 SOURCES += \
+    Src/BasicView/StdIconSearchListView.cpp \
+    Src/BasicView/StdIconTable.cpp \
+    Src/Gui/CPURegistersView.cpp \
+    Src/Gui/SystemBreakpointScriptDialog.cpp \
+    Src/Imports.cpp \
+    Src/Tracer/TraceRegisters.cpp \
+    Src/Tracer/TraceWidget.cpp \
     Src/main.cpp \
     Src/Gui/MainWindow.cpp \
     Src/Gui/CPUWidget.cpp \
@@ -183,10 +190,17 @@ SOURCES += \
     Src/BasicView/AbstractStdTable.cpp \
     Src/Gui/ZehSymbolTable.cpp \
     Src/BasicView/StdSearchListView.cpp \
-    Src/BasicView/StdTableSearchList.cpp
+    Src/BasicView/StdTableSearchList.cpp \
+    Src/Utils/BackgroundFlickerThread.cpp
 
 
 HEADERS += \
+    Src/BasicView/StdIconSearchListView.h \
+    Src/BasicView/StdIconTable.h \
+    Src/Gui/CPURegistersView.h \
+    Src/Gui/SystemBreakpointScriptDialog.h \
+    Src/Tracer/TraceRegisters.h \
+    Src/Tracer/TraceWidget.h \
     Src/main.h \
     Src/Gui/MainWindow.h \
     Src/Gui/CPUWidget.h \
@@ -305,10 +319,12 @@ HEADERS += \
     Src/BasicView/StdSearchListView.h \
     Src/Gui/FileLines.h \
     Src/BasicView/StdTableSearchList.h \
-    Src/Utils/MethodInvoker.h
+    Src/Utils/MethodInvoker.h \
+    Src/Utils/BackgroundFlickerThread.h
     
 
 FORMS += \
+    Src/Gui/SystemBreakpointScriptDialog.ui \
     Src/Gui/MainWindow.ui \
     Src/Gui/CPUWidget.ui \
     Src/Gui/GotoDialog.ui \
@@ -343,7 +359,8 @@ FORMS += \
     Src/Gui/SimpleTraceDialog.ui \
     Src/Gui/MessagesBreakpoints.ui \
     Src/Gui/AboutDialog.ui \
-    Src/Gui/ComboBoxDialog.ui
+    Src/Gui/ComboBoxDialog.ui \
+    Src/Tracer/TraceWidget.ui
 
 ##
 ## Libraries

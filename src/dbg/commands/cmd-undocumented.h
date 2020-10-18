@@ -14,3 +14,5 @@ bool cbInstrBriefcheck(int argc, char* argv[]);
 bool cbInstrFocusinfo(int argc, char* argv[]);
 bool cbInstrFlushlog(int argc, char* argv[]);
 bool cbInstrAnimateWait(int argc, char* argv[]);
+bool cbInstrDbdecompress(int argc, char* argv[]);
+bool cbInstrDebugFlags(int argc, char* argv[]);

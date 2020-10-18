@@ -502,3 +502,35 @@ bool cbInstrAnimateWait(int argc, char* argv[])
     }
     return true;
 }
+
+#include <lz4/lz4file.h>
+
+bool cbInstrDbdecompress(int argc, char* argv[])
+{
+    if(argc < 2)
+    {
+        dprintf_untranslated("Usage: dbdecompress \"c:\\path\\to\\db\"\n");
+        return false;
+    }
+    auto dbFile = StringUtils::Utf8ToUtf16(argv[1]);
+    if(LZ4_decompress_fileW(dbFile.c_str(), dbFile.c_str()) != LZ4_SUCCESS)
+    {
+        dprintf_untranslated("Failed to decompress '%s'\n", argv[1]);
+        return false;
+    }
+    dprintf_untranslated("Decompressed '%s'\n", argv[1]);
+    return true;
+}
+
+bool cbInstrDebugFlags(int argc, char* argv[])
+{
+    if(argc < 2)
+    {
+        dprintf_untranslated("Usage: DebugFlags 0xFFFFFFFF\n");
+        return false;
+    }
+    auto debugFlags = DbgValFromString(argv[1]);
+    dbgsetdebugflags(debugFlags);
+    dprintf_untranslated("DebugFlags = 0x%08X\n", debugFlags);
+    return true;
+}

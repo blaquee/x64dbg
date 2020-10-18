@@ -43,7 +43,7 @@
 #include "CPUMultiDump.h"
 #include "CPUStack.h"
 #include "GotoDialog.h"
-#include "BrowseDialog.h"
+#include "SystemBreakpointScriptDialog.h"
 #include "CustomizeMenuDialog.h"
 #include "main.h"
 #include "SimpleTraceDialog.h"
@@ -52,6 +52,7 @@
 #include "AboutDialog.h"
 #include "UpdateChecker.h"
 #include "Tracer/TraceBrowser.h"
+#include "Tracer/TraceWidget.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -60,9 +61,25 @@ MainWindow::MainWindow(QWidget* parent)
     ui->setupUi(this);
 
     // Build information
-    QAction* buildInfo = new QAction(ToDateString(GetCompileDate()), this);
-    buildInfo->setEnabled(false);
-    ui->menuBar->addAction(buildInfo);
+    {
+        const char* debugEngine = []
+        {
+            switch(DbgGetDebugEngine())
+            {
+            case DebugEngineTitanEngine:
+                return "TitanEngine";
+            case DebugEngineGleeBug:
+                return "GleeBug";
+            case DebugEngineStaticEngine:
+                return "StaticEngine";
+            }
+            return "";
+        }();
+
+        QAction* buildInfo = new QAction(tr("%1 (%2)").arg(ToDateString(GetCompileDate())).arg(debugEngine), this);
+        buildInfo->setEnabled(false);
+        ui->menuBar->addAction(buildInfo);
+    }
 
     // Setup bridge signals
     connect(Bridge::getBridge(), SIGNAL(updateWindowTitle(QString)), this, SLOT(updateWindowTitleSlot(QString)));
@@ -84,6 +101,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(Bridge::getBridge(), SIGNAL(setNameMenuEntry(int, QString)), this, SLOT(setNameMenuEntry(int, QString)));
     connect(Bridge::getBridge(), SIGNAL(setNameMenu(int, QString)), this, SLOT(setNameMenu(int, QString)));
     connect(Bridge::getBridge(), SIGNAL(showCpu()), this, SLOT(displayCpuWidget()));
+    connect(Bridge::getBridge(), SIGNAL(showReferences()), this, SLOT(displayReferencesWidget()));
     connect(Bridge::getBridge(), SIGNAL(addQWidgetTab(QWidget*)), this, SLOT(addQWidgetTab(QWidget*)));
     connect(Bridge::getBridge(), SIGNAL(showQWidgetTab(QWidget*)), this, SLOT(showQWidgetTab(QWidget*)));
     connect(Bridge::getBridge(), SIGNAL(closeQWidgetTab(QWidget*)), this, SLOT(closeQWidgetTab(QWidget*)));
@@ -200,22 +218,17 @@ MainWindow::MainWindow(QWidget* parent)
     mHandlesView->setWindowTitle(tr("Handles"));
     mHandlesView->setWindowIcon(DIcon("handles.png"));
 
-    // Graph view
-    mGraphView = new DisassemblerGraphView(this);
-    mGraphView->setWindowTitle(tr("Graph"));
-    mGraphView->setWindowIcon(DIcon("graph.png"));
-
     // Trace view
-    mTraceBrowser = new TraceBrowser(this);
-    mTraceBrowser->setWindowTitle(tr("Trace"));
-    mTraceBrowser->setWindowIcon(DIcon("trace.png"));
-    connect(mTraceBrowser, SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
+    mTraceWidget = new TraceWidget(this);
+    mTraceWidget->setWindowTitle(tr("Trace"));
+    mTraceWidget->setWindowIcon(DIcon("trace.png"));
+    connect(mTraceWidget->getTraceBrowser(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
+    connect(mTraceWidget->getTraceBrowser(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
 
     mTabWidget = new MHTabWidget(this, true, true);
 
     // Add all widgets to the list
     mWidgetList.push_back(WidgetInfo(mCpuWidget, "CPUTab"));
-    mWidgetList.push_back(WidgetInfo(mGraphView, "GraphTab"));
     mWidgetList.push_back(WidgetInfo(mLogView, "LogTab"));
     mWidgetList.push_back(WidgetInfo(mNotesManager, "NotesTab"));
     mWidgetList.push_back(WidgetInfo(mBreakpointsView, "BreakpointsTab"));
@@ -228,7 +241,7 @@ MainWindow::MainWindow(QWidget* parent)
     mWidgetList.push_back(WidgetInfo(mReferenceManager, "ReferencesTab"));
     mWidgetList.push_back(WidgetInfo(mThreadView, "ThreadsTab"));
     mWidgetList.push_back(WidgetInfo(mHandlesView, "HandlesTab"));
-    mWidgetList.push_back(WidgetInfo(mTraceBrowser, "TraceTab"));
+    mWidgetList.push_back(WidgetInfo(mTraceWidget, "TraceTab"));
 
     // If LoadSaveTabOrder disabled, load tabs in default order
     if(!ConfigBool("Gui", "LoadSaveTabOrder"))
@@ -337,10 +350,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displaySourceManagerWidget()), this, SLOT(displaySourceViewWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
-    connect(mCpuWidget->getDisasmWidget(), SIGNAL(displayGraphWidget()), this, SLOT(displayGraphWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(displaySymbolsWidget()), this, SLOT(displaySymbolWidget()));
     connect(mCpuWidget->getDisasmWidget(), SIGNAL(showPatches()), this, SLOT(patchWindow()));
-
+    connect(mCpuWidget->getGraphWidget(), SIGNAL(displayLogWidget()), this, SLOT(displayLogWidget()));
 
     connect(mCpuWidget->getDumpWidget(), SIGNAL(displayReferencesWidget()), this, SLOT(displayReferencesWidget()));
 
@@ -349,12 +361,12 @@ MainWindow::MainWindow(QWidget* parent)
     connect(mTabWidget, SIGNAL(tabMovedTabWidget(int, int)), this, SLOT(tabMovedSlot(int, int)));
     connect(Config(), SIGNAL(shortcutsUpdated()), this, SLOT(refreshShortcuts()));
 
-    // Setup favourite tools menu
+    // Menu stuff
+    actionManageFavourites = nullptr;
+    mFavouriteToolbar = new QToolBar(tr("Favourite Toolbox"), this);
     updateFavouriteTools();
-
-    // Setup language menu
     setupLanguagesMenu();
-
+    setupThemesMenu();
     setupMenuCustomization();
 
     // Set default setttings (when not set)
@@ -426,6 +438,100 @@ void MainWindow::setupLanguagesMenu()
     languageMenu->addAction(action_enUS);
     connect(languageMenu, SIGNAL(aboutToShow()), this, SLOT(setupLanguagesMenu2())); //Load this menu later, since it requires directory scanning.
     ui->menuOptions->addMenu(languageMenu);
+}
+
+#include "../src/bridge/Utf8Ini.h"
+
+static void importSettings(const QString & filename, const QSet<QString> & sectionWhitelist = {})
+{
+    QFile f(QDir::toNativeSeparators(filename));
+    if(f.open(QFile::ReadOnly | QFile::Text))
+    {
+        QTextStream in(&f);
+        auto style = in.readAll();
+        f.close();
+        Utf8Ini ini;
+        int errorLine;
+        if(ini.Deserialize(style.toStdString(), errorLine))
+        {
+            auto sections = ini.Sections();
+            for(const auto & section : sections)
+            {
+                if(!sectionWhitelist.isEmpty() && !sectionWhitelist.contains(QString::fromStdString(section)))
+                    continue;
+
+                auto keys = ini.Keys(section);
+                for(const auto & key : keys)
+                    BridgeSettingSet(section.c_str(), key.c_str(), ini.GetValue(section, key).c_str());
+            }
+            Config()->load();
+            DbgSettingsUpdated();
+            emit Config()->colorsUpdated();
+            emit Config()->fontsUpdated();
+            emit Config()->guiOptionsUpdated();
+            emit Config()->shortcutsUpdated();
+            emit Config()->tokenizerConfigUpdated();
+            GuiUpdateAllViews();
+        }
+    }
+}
+
+void MainWindow::loadSelectedStyle(bool reloadStyleCss)
+{
+    char selectedTheme[MAX_SETTING_SIZE] = "";
+    QString stylePath(":/css/default.css");
+    QString styleSettings;
+    if(BridgeSettingGet("Theme", "Selected", selectedTheme) && *selectedTheme)
+    {
+        QString themePath = QString("%1/../themes/%2/style.css").arg(QCoreApplication::applicationDirPath()).arg(selectedTheme);
+        if(QFile(themePath).exists())
+            stylePath = themePath;
+        QString settingsPath = QString("%1/../themes/%2/style.ini").arg(QCoreApplication::applicationDirPath()).arg(selectedTheme);
+        if(QFile(themePath).exists())
+            styleSettings = settingsPath;
+    }
+    QFile f(stylePath);
+    if(f.open(QFile::ReadOnly | QFile::Text))
+    {
+        QTextStream in(&f);
+        auto style = in.readAll();
+        f.close();
+        style = style.replace("url(./", QString("url(../themes/%2/").arg(selectedTheme));
+        qApp->setStyleSheet(style);
+    }
+    if(!reloadStyleCss && !styleSettings.isEmpty())
+        importSettings(styleSettings, { "Colors", "Fonts" });
+}
+
+void MainWindow::themeTriggeredSlot()
+{
+    QAction* action = qobject_cast<QAction*>(sender());
+    if(action == nullptr)
+        return;
+    QString dir = action->data().toString();
+    int nameIdx = dir.lastIndexOf('/');
+    QString name = dir.mid(nameIdx + 1);
+    BridgeSettingSet("Theme", "Selected", name.toUtf8().constData());
+    loadSelectedStyle();
+}
+
+void MainWindow::setupThemesMenu()
+{
+    auto exists = [](const QString & str)
+    {
+        return QFile(str).exists();
+    };
+    QDirIterator it(QString("%1/../themes").arg(QCoreApplication::applicationDirPath()), QDir::NoDotAndDotDot | QDir::Dirs);
+    while(it.hasNext())
+    {
+        auto dir = it.next();
+        auto nameIdx = dir.lastIndexOf('/');
+        auto name = dir.mid(nameIdx + 1);
+        auto action = ui->menuTheme->addAction(name);
+        connect(action, SIGNAL(triggered()), this, SLOT(themeTriggeredSlot()));
+        action->setText(name);
+        action->setData(dir);
+    }
 }
 
 void MainWindow::setupLanguagesMenu2()
@@ -640,6 +746,11 @@ void MainWindow::saveWindowSettings()
                              mWidgetList[i].widget->parentWidget()->saveGeometry().toBase64().data());
     }
 
+    // Save favourite toolbar
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarPositionX", mFavouriteToolbar->x());
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarPositionY", mFavouriteToolbar->y());
+    BridgeSettingSetUint("Main Window Settings", "FavToolbarVisible", mFavouriteToolbar->isVisible() ? 1 : 0);
+
     mCpuWidget->saveWindowSettings();
     mSymbolView->saveWindowSettings();
 }
@@ -683,6 +794,14 @@ void MainWindow::loadWindowSettings()
         if(isDeleted)
             mTabWidget->DeleteTab(mTabWidget->indexOf(mWidgetList[i].widget));
     }
+
+    // Load favourite toolbar
+    duint posx = 0, posy = 0, isVisible = 0;
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarPositionX", &posx);
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarPositionY", &posy);
+    BridgeSettingGetUint("Main Window Settings", "FavToolbarVisible", &isVisible);
+    mFavouriteToolbar->move(posx, posy);
+    mFavouriteToolbar->setVisible(isVisible == 1);
 
     mCpuWidget->loadWindowSettings();
     mSymbolView->loadWindowSettings();
@@ -815,7 +934,7 @@ void MainWindow::execCommandSlot()
 {
     QAction* action = qobject_cast<QAction*>(sender());
     if(action)
-        DbgCmdExec(action->data().toString().toUtf8().constData());
+        DbgCmdExec(action->data().toString());
 }
 
 void MainWindow::setFocusToCommandBar()
@@ -901,7 +1020,7 @@ void MainWindow::openFileSlot()
 
 void MainWindow::openRecentFileSlot(QString filename)
 {
-    DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()).toUtf8().constData());
+    DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()));
 }
 
 void MainWindow::runSlot()
@@ -916,7 +1035,7 @@ void MainWindow::restartDebugging()
 {
     auto last = mMRUList->getEntry(0);
     if(!last.isEmpty())
-        DbgCmdExec(QString("init \"%1\"").arg(last).toUtf8().constData());
+        DbgCmdExec(QString("init \"%1\"").arg(last));
 }
 
 void MainWindow::displayBreakpointWidget()
@@ -937,7 +1056,7 @@ void MainWindow::dropEvent(QDropEvent* pEvent)
     if(pEvent->mimeData()->hasUrls())
     {
         QString filename = QDir::toNativeSeparators(pEvent->mimeData()->urls()[0].toLocalFile());
-        DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()).toUtf8().constData());
+        DbgCmdExec(QString().sprintf("init \"%s\"", filename.toUtf8().constData()));
         pEvent->acceptProposedAction();
     }
 }
@@ -968,6 +1087,7 @@ void MainWindow::updateWindowTitleSlot(QString filename)
 void MainWindow::displayCpuWidget()
 {
     showQWidgetTab(mCpuWidget);
+    mCpuWidget->setDisasmFocus();
 }
 
 void MainWindow::displaySymbolWidget()
@@ -992,7 +1112,8 @@ void MainWindow::displayThreadsWidget()
 
 void MainWindow::displayGraphWidget()
 {
-    showQWidgetTab(mGraphView);
+    showQWidgetTab(mCpuWidget);
+    mCpuWidget->setGraphFocus();
 }
 
 void MainWindow::displayPreviousTab()
@@ -1069,13 +1190,13 @@ void MainWindow::setLastException(unsigned int exceptionCode)
 
 void MainWindow::findStrings()
 {
-    DbgCmdExec(QString("strref " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+    DbgCmdExec(QString("strref " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())));
     displayReferencesWidget();
 }
 
 void MainWindow::findModularCalls()
 {
-    DbgCmdExec(QString("modcallfind " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+    DbgCmdExec(QString("modcallfind " + ToPtrString(mCpuWidget->getDisasmWidget()->getSelectedVa())));
     displayReferencesWidget();
 }
 
@@ -1420,7 +1541,7 @@ void MainWindow::setNameMenu(int hMenu, QString name)
 void MainWindow::runSelection()
 {
     if(DbgIsDebugging())
-        DbgCmdExec(("run " + ToPtrString(mGraphView->hasFocus() ? mGraphView->get_cursor_pos() : mCpuWidget->getDisasmWidget()->getSelectedVa())).toUtf8().constData());
+        DbgCmdExec(("run " + ToPtrString(mCpuWidget->getSelectionVa())));
 }
 
 void MainWindow::runExpression()
@@ -1504,7 +1625,7 @@ void MainWindow::displaySEHChain()
 
 void MainWindow::displayRunTrace()
 {
-    showQWidgetTab(mTraceBrowser);
+    showQWidgetTab(mTraceWidget);
 }
 
 void MainWindow::donate()
@@ -1678,6 +1799,8 @@ void MainWindow::executeOnGuiThread(void* cbGuiThread, void* userdata)
 
 void MainWindow::tabMovedSlot(int from, int to)
 {
+    Q_UNUSED(from);
+    Q_UNUSED(to);
     for(int i = 0; i < mTabWidget->count(); i++)
     {
         // Remove space in widget name and append Tab to get config settings (CPUTab, MemoryMapTab, etc...)
@@ -1713,16 +1836,7 @@ void MainWindow::on_actionFaq_triggered()
 
 void MainWindow::on_actionReloadStylesheet_triggered()
 {
-    QFile f(QString("%1/style.css").arg(QCoreApplication::applicationDirPath()));
-    if(f.open(QFile::ReadOnly | QFile::Text))
-    {
-        QTextStream in(&f);
-        auto style = in.readAll();
-        f.close();
-        qApp->setStyleSheet(style);
-    }
-    else
-        qApp->setStyleSheet("");
+    loadSelectedStyle(true);
     ensurePolished();
     update();
 }
@@ -1744,36 +1858,79 @@ void MainWindow::manageFavourites()
     updateFavouriteTools();
 }
 
+static void splitToolPath(const QString & toolPath, QString & file, QString & cmd)
+{
+    if(toolPath.startsWith('\"'))
+    {
+        auto endQuote = toolPath.indexOf('\"', 1);
+        if(endQuote == -1) //"failure with spaces
+            file = toolPath.mid(1);
+        else //"path with spaces" arguments
+        {
+            file = toolPath.mid(1, endQuote - 1);
+            cmd = toolPath.mid(endQuote + 1);
+        }
+    }
+    else
+    {
+        auto firstSpace = toolPath.indexOf(' ');
+        if(firstSpace == -1) //pathwithoutspaces
+            file = toolPath;
+        else //pathwithoutspaces argument
+        {
+            file = toolPath.left(firstSpace);
+            cmd = toolPath.mid(firstSpace + 1);
+        }
+    }
+    file = file.trimmed();
+    cmd = cmd.trimmed();
+}
+
 void MainWindow::updateFavouriteTools()
 {
     char buffer[MAX_SETTING_SIZE];
     bool isanythingexists = false;
     ui->menuFavourites->clear();
+    delete actionManageFavourites;
+    mFavouriteToolbar->clear();
+    actionManageFavourites = new QAction(DIcon("star.png"), tr("&Manage Favourite Tools..."), this);
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Tool%1").arg(i).toUtf8().constData(), buffer); i++)
     {
-        QString exePath = QString(buffer);
-        QAction* newAction = new QAction(this);
-        newAction->setData(QVariant(QString("Tool,%1").arg(exePath)));
+        QString toolPath = QString(buffer);
+        QAction* newAction = new QAction(actionManageFavourites); // Auto delete these actions on updateFavouriteTools()
+        // Set up user data to be used in clickFavouriteTool()
+        newAction->setData(QVariant(QString("Tool,%1").arg(toolPath)));
         if(BridgeSettingGet("Favourite", QString("ToolShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
         if(BridgeSettingGet("Favourite", QString("ToolDescription%1").arg(i).toUtf8().constData(), buffer))
             newAction->setText(QString(buffer));
         else
-            newAction->setText(exePath);
+            newAction->setText(toolPath);
+        // Get the icon of the executable
+        QString file, cmd;
+        QIcon icon;
+        splitToolPath(toolPath, file, cmd);
+        icon = getFileIcon(file);
+        if(icon.isNull())
+            icon = DIcon("plugin.png");
+        newAction->setIcon(icon);
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
     {
         isanythingexists = false;
         ui->menuFavourites->addSeparator();
+        mFavouriteToolbar->addSeparator();
     }
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Script%1").arg(i).toUtf8().constData(), buffer); i++)
     {
         QString scriptPath = QString(buffer);
-        QAction* newAction = new QAction(this);
+        QAction* newAction = new QAction(actionManageFavourites);
+        // Set up user data to be used in clickFavouriteTool()
         newAction->setData(QVariant(QString("Script,%1").arg(scriptPath)));
         if(BridgeSettingGet("Favourite", QString("ScriptShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
@@ -1783,31 +1940,41 @@ void MainWindow::updateFavouriteTools()
         else
             newAction->setText(scriptPath);
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
+        newAction->setIcon(DIcon("script-code.png"));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
     {
         isanythingexists = false;
         ui->menuFavourites->addSeparator();
+        mFavouriteToolbar->addSeparator();
     }
     for(unsigned int i = 1; BridgeSettingGet("Favourite", QString("Command%1").arg(i).toUtf8().constData(), buffer); i++)
     {
-        QAction* newAction = new QAction(QString(buffer), this);
+        QAction* newAction = new QAction(QString(buffer), actionManageFavourites);
+        // Set up user data to be used in clickFavouriteTool()
         newAction->setData(QVariant(QString("Command")));
         if(BridgeSettingGet("Favourite", QString("CommandShortcut%1").arg(i).toUtf8().constData(), buffer))
             if(*buffer && strcmp(buffer, "NOT_SET") != 0)
                 setGlobalShortcut(newAction, QKeySequence(QString(buffer)));
         connect(newAction, SIGNAL(triggered()), this, SLOT(clickFavouriteTool()));
+        newAction->setIcon(DIcon("star.png"));
         ui->menuFavourites->addAction(newAction);
+        mFavouriteToolbar->addAction(newAction);
         isanythingexists = true;
     }
     if(isanythingexists)
+    {
         ui->menuFavourites->addSeparator();
-    actionManageFavourites = new QAction(DIcon("star.png"), tr("&Manage Favourite Tools..."), this);
+        mFavouriteToolbar->addSeparator();
+    }
     ui->menuFavourites->addAction(actionManageFavourites);
     setGlobalShortcut(actionManageFavourites, ConfigShortcut("FavouritesManage"));
     connect(ui->menuFavourites->actions().last(), SIGNAL(triggered()), this, SLOT(manageFavourites()));
+    mFavouriteToolbar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->menuFavourites->addAction(mFavouriteToolbar->toggleViewAction());
 }
 
 static QString stringFormatInline(const QString & format)
@@ -1858,30 +2025,7 @@ void MainWindow::clickFavouriteTool()
         else if(GetLastError() == ERROR_ELEVATION_REQUIRED)
         {
             QString file, cmd;
-            if(toolPath.startsWith('\"'))
-            {
-                auto endQuote = toolPath.indexOf('\"', 1);
-                if(endQuote == -1) //"failure with spaces
-                    file = toolPath.mid(1);
-                else //"path with spaces" arguments
-                {
-                    file = toolPath.mid(1, endQuote - 1);
-                    cmd = toolPath.mid(endQuote + 1);
-                }
-            }
-            else
-            {
-                auto firstSpace = toolPath.indexOf(' ');
-                if(firstSpace == -1) //pathwithoutspaces
-                    file = toolPath;
-                else //pathwithoutspaces argument
-                {
-                    file = toolPath.left(firstSpace);
-                    cmd = toolPath.mid(firstSpace + 1);
-                }
-            }
-            file = file.trimmed();
-            cmd = cmd.trimmed();
+            splitToolPath(toolPath, file, cmd);
             ShellExecuteW(nullptr, L"runas", file.toStdWString().c_str(), cmd.toStdWString().c_str(), nullptr, SW_SHOWNORMAL);
         }
     }
@@ -1893,7 +2037,7 @@ void MainWindow::clickFavouriteTool()
     }
     else if(data.compare("Command") == 0)
     {
-        DbgCmdExec(action->text().toUtf8().constData());
+        DbgCmdExec(action->text());
     }
 }
 
@@ -2019,26 +2163,8 @@ void MainWindow::animateCommandSlot()
 
 void MainWindow::setInitializationScript()
 {
-    QString global, debuggee;
-    char globalChar[MAX_SETTING_SIZE];
-    if(DbgIsDebugging())
-    {
-        debuggee = QString(DbgFunctions()->DbgGetDebuggeeInitScript());
-        BrowseDialog browseScript(this, tr("Set Initialization Script for Debuggee"), tr("Set Initialization Script for Debuggee"), tr("Script files (*.txt *.scr);;All files (*.*)"), debuggee, false);
-        browseScript.setWindowIcon(DIcon("initscript.png"));
-        if(browseScript.exec() == QDialog::Accepted)
-            DbgFunctions()->DbgSetDebuggeeInitScript(browseScript.path.toUtf8().constData());
-    }
-    if(BridgeSettingGet("Engine", "InitializeScript", globalChar))
-        global = QString(globalChar);
-    else
-        global = QString();
-    BrowseDialog browseScript(this, tr("Set Global Initialization Script"), tr("Set Global Initialization Script"), tr("Script files (*.txt *.scr);;All files (*.*)"), global, false);
-    browseScript.setWindowIcon(DIcon("initscript.png"));
-    if(browseScript.exec() == QDialog::Accepted)
-    {
-        BridgeSettingSet("Engine", "InitializeScript", browseScript.path.toUtf8().constData());
-    }
+    SystemBreakpointScriptDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::customizeMenu()
@@ -2050,39 +2176,12 @@ void MainWindow::customizeMenu()
     onMenuCustomized();
 }
 
-#include "../src/bridge/Utf8Ini.h"
-
 void MainWindow::on_actionImportSettings_triggered()
 {
     auto filename = QFileDialog::getOpenFileName(this, tr("Open file"), QCoreApplication::applicationDirPath(), tr("Settings (*.ini);;All files (*.*)"));
     if(!filename.length())
         return;
-    QFile f(QDir::toNativeSeparators(filename));
-    if(f.open(QFile::ReadOnly | QFile::Text))
-    {
-        QTextStream in(&f);
-        auto style = in.readAll();
-        f.close();
-        Utf8Ini ini;
-        int errorLine;
-        if(ini.Deserialize(style.toStdString(), errorLine))
-        {
-            auto sections = ini.Sections();
-            for(const auto & section : sections)
-            {
-                auto keys = ini.Keys(section);
-                for(const auto & key : keys)
-                    BridgeSettingSet(section.c_str(), key.c_str(), ini.GetValue(section, key).c_str());
-            }
-            Config()->load();
-            DbgSettingsUpdated();
-            emit Config()->colorsUpdated();
-            emit Config()->fontsUpdated();
-            emit Config()->shortcutsUpdated();
-            emit Config()->tokenizerConfigUpdated();
-            GuiUpdateAllViews();
-        }
-    }
+    importSettings(filename);
 }
 
 void MainWindow::on_actionImportdatabase_triggered()
@@ -2092,7 +2191,7 @@ void MainWindow::on_actionImportdatabase_triggered()
     auto filename = QFileDialog::getOpenFileName(this, tr("Import database"), QString(), tr("Databases (%1);;All files (*.*)").arg(ArchValue("*.dd32", "*.dd64")));
     if(!filename.length())
         return;
-    DbgCmdExec(QString("dbload \"%1\"").arg(QDir::toNativeSeparators(filename)).toUtf8().constData());
+    DbgCmdExec(QString("dbload \"%1\"").arg(QDir::toNativeSeparators(filename)));
 }
 
 void MainWindow::on_actionExportdatabase_triggered()
@@ -2102,7 +2201,7 @@ void MainWindow::on_actionExportdatabase_triggered()
     auto filename = QFileDialog::getSaveFileName(this, tr("Export database"), QString(), tr("Databases (%1);;All files (*.*)").arg(ArchValue("*.dd32", "*.dd64")));
     if(!filename.length())
         return;
-    DbgCmdExec(QString("dbsave \"%1\"").arg(QDir::toNativeSeparators(filename)).toUtf8().constData());
+    DbgCmdExec(QString("dbsave \"%1\"").arg(QDir::toNativeSeparators(filename)));
 }
 
 static void setupMenuCustomizationHelper(QMenu* parentMenu, QList<QAction*> & stringList)
@@ -2199,4 +2298,20 @@ void MainWindow::on_actionPlugins_triggered()
 void MainWindow::on_actionCheckUpdates_triggered()
 {
     mUpdateChecker->checkForUpdates();
+}
+
+void MainWindow::on_actionDefaultTheme_triggered()
+{
+    // Delete [Theme] Selected
+    BridgeSettingSet("Theme", "Selected", nullptr);
+    // Load style
+    loadSelectedStyle();
+    // Reset [Colors] to default
+    Config()->Colors = Config()->defaultColors;
+    Config()->writeColors();
+    // Reset [Fonts] to default
+    //Config()->Fonts = Config()->defaultFonts;
+    //Config()->writeFonts();
+    // Remove custom colors
+    BridgeSettingSet("Colors", "CustomColorCount", nullptr);
 }

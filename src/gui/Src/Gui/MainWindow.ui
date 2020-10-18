@@ -23,7 +23,7 @@
      <x>0</x>
      <y>0</y>
      <width>868</width>
-     <height>23</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -157,6 +157,12 @@
     <property name="title">
      <string>&amp;Options</string>
     </property>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>&amp;Theme</string>
+     </property>
+     <addaction name="actionDefaultTheme"/>
+    </widget>
     <addaction name="actionSettings"/>
     <addaction name="actionAppearance"/>
     <addaction name="actionShortcuts"/>
@@ -165,6 +171,7 @@
     <addaction name="actionReloadStylesheet"/>
     <addaction name="actionSetInitializationScript"/>
     <addaction name="actionImportSettings"/>
+    <addaction name="menuTheme"/>
    </widget>
    <widget class="QMenu" name="menuFavourites">
     <property name="title">
@@ -173,7 +180,7 @@
    </widget>
    <widget class="QMenu" name="menu_Trace">
     <property name="title">
-     <string>&amp;Trace</string>
+     <string>Traci&amp;ng</string>
     </property>
     <widget class="QMenu" name="menuTrace_record">
      <property name="title">
@@ -951,7 +958,7 @@
   <action name="actionCrashDump">
    <property name="icon">
     <iconset resource="../../resource.qrc">
-     <normaloff>:/icons/images/fatal-error.png</normaloff>:/icons/images/fatal-error.png</iconset>
+     <normaloff>:/icons/images/crash_dump.png</normaloff>:/icons/images/crash_dump.png</iconset>
    </property>
    <property name="text">
     <string>Generate crash dump</string>
@@ -1062,7 +1069,7 @@
      <normaloff>:/icons/images/initscript.png</normaloff>:/icons/images/initscript.png</iconset>
    </property>
    <property name="text">
-    <string>Set Initialization Script</string>
+    <string>System breakpoint scripts</string>
    </property>
   </action>
   <action name="actionImportSettings">
@@ -1189,6 +1196,16 @@
    </property>
    <property name="text">
     <string>Modules</string>
+   </property>
+  </action>
+  <action name="action_Theme">
+   <property name="text">
+    <string>&amp;Theme</string>
+   </property>
+  </action>
+  <action name="actionDefaultTheme">
+   <property name="text">
+    <string>&amp;Default</string>
    </property>
   </action>
  </widget>

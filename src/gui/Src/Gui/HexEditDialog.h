@@ -17,7 +17,7 @@ public:
     explicit HexEditDialog(QWidget* parent = 0);
     ~HexEditDialog();
 
-    void showEntireBlock(bool show);
+    void showEntireBlock(bool show, bool checked = false);
     void showKeepSize(bool show);
     void isDataCopiable(bool copyDataEnabled);
     void updateCodepage();
@@ -76,6 +76,7 @@ private:
         DataPascalWord,
         DataPascalDword,
         DataPascalQword,
+        DataPython3Byte,
         DataString,
         DataUnicodeString,
         DataUTF8String,

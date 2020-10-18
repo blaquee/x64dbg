@@ -3,6 +3,7 @@
 #include <QColorDialog>
 #include <QFontDialog>
 #include <QMessageBox>
+#include <memory>
 #include "Configuration.h"
 #include "StringUtil.h"
 #include "MiscUtil.h"
@@ -23,6 +24,7 @@ AppearanceDialog::AppearanceDialog(QWidget* parent) : QDialog(parent), ui(new Ui
     fontMap = &Config()->Fonts;
     fontBackupMap = *fontMap;
     fontInit();
+    ui->exampleText->setFont(ConfigFont("AbstractTableView"));
     connect(this, SIGNAL(rejected()), this, SLOT(rejectedSlot()));
 }
 
@@ -179,6 +181,10 @@ void AppearanceDialog::on_editBackgroundColor_textChanged(const QString & arg1)
             emit Config()->colorsUpdated();
             GuiUpdateAllViews();
         }
+        if(QColor(ui->editColor->text()).isValid())
+            ui->exampleText->setStyleSheet(QString("color: %1").arg(ui->editColor->text()));
+        else
+            ui->exampleText->setStyleSheet(QString("color: black"));
     }
     else
     {
@@ -200,6 +206,21 @@ void AppearanceDialog::on_editBackgroundColor_textChanged(const QString & arg1)
             if(colorMap->contains(id))
                 ui->buttonSave->setEnabled(false); //we cannot save with an invalid color
         }
+        if(ui->editBackgroundColor->isEnabled())
+        {
+            if(QColor(ui->editColor->text()).isValid())
+                ui->exampleText->setStyleSheet(QString("color: %1; background-color: %2").arg(ui->editColor->text()).arg(arg1));
+            else
+                ui->exampleText->setStyleSheet(QString("color: black; background-color: %1").arg(arg1));
+        }
+        else
+        {
+            if(QColor(ui->editColor->text()).isValid())
+                ui->exampleText->setStyleSheet(QString("color: %1").arg(ui->editColor->text()));
+            else
+                ui->exampleText->setStyleSheet(QString("color: black"));
+        }
+        ui->exampleText->setFont(ConfigFont("AbstractTableView"));
     }
     ui->buttonBackgroundColor->setStyleSheet(styleSheet);
 }
@@ -231,6 +252,11 @@ void AppearanceDialog::on_editColor_textChanged(const QString & arg1)
             emit Config()->colorsUpdated();
             GuiUpdateAllViews();
         }
+        if(QColor(ui->editBackgroundColor->text()).isValid() && ui->editBackgroundColor->isEnabled())
+            ui->exampleText->setStyleSheet(QString("color: %1; background-color: %2").arg(arg1).arg(ui->editBackgroundColor->text()));
+        else
+            ui->exampleText->setStyleSheet(QString("color: %1").arg(arg1));
+        ui->exampleText->setFont(ConfigFont("AbstractTableView"));
     }
     else
     {
@@ -243,26 +269,12 @@ void AppearanceDialog::on_editColor_textChanged(const QString & arg1)
 
 void AppearanceDialog::on_buttonColor_clicked()
 {
-    QColorDialog colorDialog(QColor(ui->editColor->text()), this);
-    if(colorDialog.exec() == QDialog::Accepted)
-        ui->editColor->setText(colorDialog.selectedColor().name().toUpper());
+    selectColor(ui->editColor);
 }
 
 void AppearanceDialog::on_buttonBackgroundColor_clicked()
 {
-    QColor initialColor;
-    if(ui->editBackgroundColor->text().toUpper() == "#XXXXXX")
-        initialColor = Qt::black; //transparent will set the alpha channel, which users will forget
-    else
-        initialColor = QColor(ui->editBackgroundColor->text());
-    QColor selectedColor = QColorDialog::getColor(initialColor, this, tr("Select Color"), QColorDialog::ShowAlphaChannel);
-    if(selectedColor.isValid())
-    {
-        if(!selectedColor.alpha())
-            ui->editBackgroundColor->setText("#XXXXXX");
-        else
-            ui->editBackgroundColor->setText(selectedColor.name().toUpper());
-    }
+    selectColor(ui->editBackgroundColor);
 }
 
 void AppearanceDialog::on_listColorNames_itemSelectionChanged()
@@ -420,10 +432,6 @@ void AppearanceDialog::colorInfoListInit()
     colorInfoListAppend(tr("Bytes"), "DisassemblyBytesColor", "DisassemblyBytesBackgroundColor");
     colorInfoListAppend(tr("Modified Bytes"), "DisassemblyModifiedBytesColor", "DisassemblyModifiedBytesBackgroundColor");
     colorInfoListAppend(tr("Restored Bytes"), "DisassemblyRestoredBytesColor", "DisassemblyRestoredBytesBackgroundColor");
-    colorInfoListAppend(tr("0x00 Bytes"), "DisassemblyByte00Color", "DisassemblyByte00BackgroundColor");
-    colorInfoListAppend(tr("0x7F Bytes"), "DisassemblyByte7FColor", "DisassemblyByte7FBackgroundColor");
-    colorInfoListAppend(tr("0xFF Bytes"), "DisassemblyByteFFColor", "DisassemblyByteFFBackgroundColor");
-    colorInfoListAppend(tr("IsPrint Bytes"), "DisassemblyByteIsPrintColor", "DisassemblyByteIsPrintBackgroundColor");
     colorInfoListAppend(tr("Relocation underline"), "DisassemblyRelocationUnderlineColor", "");
     colorInfoListAppend(ArchValue(tr("EIP"), tr("RIP")), "DisassemblyCipColor", "DisassemblyCipBackgroundColor");
     colorInfoListAppend(tr("Breakpoints"), "DisassemblyBreakpointColor", "DisassemblyBreakpointBackgroundColor");
@@ -445,9 +453,9 @@ void AppearanceDialog::colorInfoListInit()
     colorInfoListAppend(tr("SideBar:"), "", "");
     colorInfoListAppend(tr("Register Labels"), "SideBarCipLabelColor", "SideBarCipLabelBackgroundColor");
     colorInfoListAppend(tr("Bullets"), "SideBarBulletColor", "");
-    colorInfoListAppend(tr("Breakpoints"), "SideBarBulletBreakpointColor", "");
-    colorInfoListAppend(tr("Disabled Breakpoints"), "SideBarBulletDisabledBreakpointColor", "");
-    colorInfoListAppend(tr("Bookmarks"), "SideBarBulletBookmarkColor", "");
+    colorInfoListAppend(tr("Breakpoint bullets"), "SideBarBulletBreakpointColor", "");
+    colorInfoListAppend(tr("Disabled Breakpoint bullets"), "SideBarBulletDisabledBreakpointColor", "");
+    colorInfoListAppend(tr("Bookmark bullets"), "SideBarBulletBookmarkColor", "");
     colorInfoListAppend(tr("Conditional Jump Lines (jump)"), "SideBarConditionalJumpLineTrueColor", "");
     colorInfoListAppend(tr("Conditional Jump Lines (no jump)"), "SideBarConditionalJumpLineFalseColor", "");
     colorInfoListAppend(tr("Unconditional Jump Lines (jump)"), "SideBarUnconditionalJumpLineTrueColor", "");
@@ -456,7 +464,6 @@ void AppearanceDialog::colorInfoListInit()
     colorInfoListAppend(tr("Conditional Jump Backwards Lines (no jump)"), "SideBarConditionalJumpLineFalseBackwardsColor", "");
     colorInfoListAppend(tr("Unconditional Jump Backwards Lines (jump)"), "SideBarUnconditionalJumpLineTrueBackwardsColor", "");
     colorInfoListAppend(tr("Unconditional Jump Backwards Lines (no jump)"), "SideBarUnconditionalJumpLineFalseBackwardsColor", "");
-    colorInfoListAppend(tr("Jump Lines (executing)"), "SideBarJumpLineExecuteColor", "");
     colorInfoListAppend(tr("Code Folding Checkbox Color"), "SideBarCheckBoxForeColor", "SideBarCheckBoxBackColor");
     colorInfoListAppend(tr("Background"), "SideBarBackgroundColor", "");
 
@@ -474,7 +481,7 @@ void AppearanceDialog::colorInfoListInit()
 
     colorInfoListAppend(tr("Instructions:"), "", "");
     colorInfoListAppend(tr("Text"), "InstructionUncategorizedColor", "InstructionUncategorizedBackgroundColor");
-    colorInfoListAppend(tr("Highlighting"), "InstructionHighlightColor", "");
+    colorInfoListAppend(tr("Highlighting"), "InstructionHighlightColor", "InstructionHighlightBackgroundColor");
     colorInfoListAppend(tr("Commas"), "InstructionCommaColor", "InstructionCommaBackgroundColor");
     colorInfoListAppend(tr("Prefixes"), "InstructionPrefixColor", "InstructionPrefixBackgroundColor");
     colorInfoListAppend(tr("Addresses"), "InstructionAddressColor", "InstructionAddressBackgroundColor");
@@ -562,7 +569,7 @@ void AppearanceDialog::colorInfoListInit()
     colorInfoListAppend(tr("Memory Map Breakpoint"), "MemoryMapBreakpointColor", "MemoryMapBreakpointBackgroundColor");
     colorInfoListAppend(tr("Memory Map %1").arg(ArchValue(tr("EIP"), tr("RIP"))), "MemoryMapCipColor", "MemoryMapCipBackgroundColor");
     colorInfoListAppend(tr("Memory Map Section Text"), "MemoryMapSectionTextColor", "");
-    colorInfoListAppend(tr("Search Highlight Color"), "SearchListViewHighlightColor", "");
+    colorInfoListAppend(tr("Search Highlight Color"), "SearchListViewHighlightColor", "SearchListViewHighlightBackgroundColor");
     colorInfoListAppend(tr("Struct primary background"), "StructBackgroundColor", "");
     colorInfoListAppend(tr("Struct secondary background"), "StructAlternateBackgroundColor", "");
     colorInfoListAppend(tr("Log Link Color") + "*", "LogLinkColor", "LogLinkBackgroundColor");
@@ -570,9 +577,12 @@ void AppearanceDialog::colorInfoListInit()
     colorInfoListAppend(tr("Breakpoint Summary Keywords"), "BreakpointSummaryKeywordColor", "");
     colorInfoListAppend(tr("Breakpoint Summary Strings"), "BreakpointSummaryStringColor", "");
     colorInfoListAppend(tr("Patch located in relocation region"), "PatchRelocatedByteHighlightColor", "");
+    colorInfoListAppend(tr("Symbol User Module Text"), "SymbolUserTextColor", "");
+    colorInfoListAppend(tr("Symbol System Module Text"), "SymbolSystemTextColor", "");
     colorInfoListAppend(tr("Symbol Unloaded Text"), "SymbolUnloadedTextColor", "");
     colorInfoListAppend(tr("Symbol Loading Text"), "SymbolLoadingTextColor", "");
     colorInfoListAppend(tr("Symbol Loaded Text"), "SymbolLoadedTextColor", "");
+    colorInfoListAppend(tr("Background Flicker Color"), "BackgroundFlickerColor", "");
 
     //dev helper
     const QMap<QString, QColor>* Colors = &Config()->defaultColors;
@@ -711,6 +721,65 @@ void AppearanceDialog::fontInit()
     //Application
     ui->labelApplicationFont->setText(fontMap->find("Application").value().family());
     isInit = false;
+}
+
+void AppearanceDialog::selectColor(QLineEdit* lineEdit, QColorDialog::ColorDialogOptions options)
+{
+    colorLineEdit = lineEdit;
+    auto oldText = lineEdit->text();
+    QColor initialColor;
+    if(oldText.toUpper() == "#XXXXXX")
+        initialColor = Qt::black; //transparent will set the alpha channel, which users will forget
+    else
+        initialColor = QColor(oldText);
+    QColorDialog dialog(initialColor, this);
+    dialog.setWindowTitle(tr("Select Color"));
+    dialog.setOptions(options);
+    connect(&dialog, &QColorDialog::currentColorChanged, this, &AppearanceDialog::colorSelectionChangedSlot);
+    duint customColorCount = 0;
+    BridgeSettingGetUint("Colors", "CustomColorCount", &customColorCount);
+    if(customColorCount > 0)
+    {
+        for(duint i = 0; i < customColorCount; i++)
+        {
+            char customColorText[MAX_SETTING_SIZE] = "";
+            if(BridgeSettingGet("Colors", QString("CustomColor%1").arg(i).toUtf8().constData(), customColorText))
+            {
+                QColor customColor;
+                if(strcmp(customColorText, "#XXXXXX") == 0)
+                    customColor = Qt::transparent;
+                else
+                    customColor = QColor(customColorText);
+                dialog.setCustomColor(i, customColor);
+            }
+        }
+    }
+    auto result = dialog.exec();
+    for(duint i = 0; i < dialog.customCount(); i++)
+    {
+        QColor customColor = dialog.customColor(i);
+        QString colorName = customColor.name().toUpper();
+        if(!customColor.alpha())
+            colorName = "#XXXXXX";
+        BridgeSettingSet("Colors", QString("CustomColor%1").arg(i).toUtf8().constData(), colorName.toUtf8().constData());
+    }
+    BridgeSettingSetUint("Colors", "CustomColorCount", dialog.customCount());
+    colorLineEdit = nullptr;
+    if(result == QDialog::Accepted)
+    {
+        lineEdit->setText(colorToString(dialog.selectedColor()));
+    }
+    else
+    {
+        lineEdit->setText(oldText);
+    }
+}
+
+QString AppearanceDialog::colorToString(const QColor & color)
+{
+    if(!color.alpha())
+        return "#XXXXXX";
+    return color.name();
 }
 
 void AppearanceDialog::on_fontAbstractTables_currentFontChanged(const QFont & f)
@@ -1052,4 +1121,10 @@ void AppearanceDialog::rejectedSlot()
     Config()->Fonts = fontBackupMap;
     emit Config()->fontsUpdated();
     GuiUpdateAllViews();
+}
+
+void AppearanceDialog::colorSelectionChangedSlot(QColor color)
+{
+    if(colorLineEdit)
+        colorLineEdit->setText(colorToString(color));
 }

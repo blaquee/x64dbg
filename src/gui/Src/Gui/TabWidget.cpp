@@ -21,7 +21,6 @@ MHTabWidget::MHTabWidget(QWidget* parent, bool allowDetach, bool allowDelete) : 
 
     setTabBar(mTabBar);
     setMovable(true);
-    setStyleSheet("QTabWidget::pane { border: 0px; }");
 
     mWindows.clear();
 }
@@ -99,7 +98,7 @@ void MHTabWidget::DetachTab(int index, const QPoint & dropPoint)
 {
     Q_UNUSED(dropPoint);
     // Create the window
-    MHDetachedWindow* detachedWidget = new MHDetachedWindow(parentWidget(), this);
+    MHDetachedWindow* detachedWidget = new MHDetachedWindow(parentWidget());
     detachedWidget->setWindowModality(Qt::NonModal);
 
     // Find Widget and connect
@@ -332,9 +331,8 @@ void MHTabWidget::deleteCurrentTab()
 
 //----------------------------------------------------------------------------
 
-MHDetachedWindow::MHDetachedWindow(QWidget* parent, MHTabWidget* tabwidget) : QMainWindow(parent)
+MHDetachedWindow::MHDetachedWindow(QWidget* parent) : QMainWindow(parent)
 {
-    mTabWidget = tabwidget;
 }
 
 MHDetachedWindow::~MHDetachedWindow()

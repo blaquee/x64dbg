@@ -9,6 +9,7 @@ class ReferenceView;
 class QVBoxLayout;
 class LabeledSplitter;
 class StdSearchListView;
+class StdIconSearchListView;
 class QMenu;
 
 class HandlesView : public QWidget
@@ -43,7 +44,7 @@ private:
     LabeledSplitter* mSplitter;
     StdSearchListView* mHandlesTable;
     StdSearchListView* mTcpConnectionsTable;
-    StdSearchListView* mWindowsTable;
+    StdIconSearchListView* mWindowsTable;
     //ReferenceView* mHeapsTable;
     StdTable* mPrivilegesTable;
 
@@ -64,8 +65,6 @@ private:
     void enumTcpConnections();
     //void enumHeaps();
     void enumPrivileges();
-
-    void AppendPrivilege(int row, const char* PrivilegeString);
 };
 
 #endif // HANDLESVIEW_H

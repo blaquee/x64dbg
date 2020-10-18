@@ -162,6 +162,7 @@ signals:
     void updateTraceBrowser();
     void symbolSelectModule(duint base);
     void getCurrentGraph(BridgeCFGraphList* graphList);
+    void showReferences();
 
 private:
     CRITICAL_SECTION csBridge;
@@ -170,8 +171,5 @@ private:
     DWORD dwMainThreadId = 0;
     volatile bool dbgStopped = false;
 };
-
-void DbgCmdExec(const QString & cmd);
-bool DbgCmdExecDirect(const QString & cmd);
 
 #endif // BRIDGE_H

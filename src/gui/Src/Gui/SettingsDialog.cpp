@@ -67,6 +67,7 @@ void SettingsDialog::LoadSettings()
     settings.engineIgnoreInconsistentBreakpoints = false;
     settings.engineNoWow64SingleStepWorkaround = false;
     settings.engineMaxTraceCount = 50000;
+    settings.engineAnimateInterval = 50;
     settings.engineHardcoreThreadSwitchWarning = false;
     settings.engineVerboseExceptionLogging = true;
     settings.exceptionRanges = &realExceptionRanges;
@@ -79,6 +80,7 @@ void SettingsDialog::LoadSettings()
     settings.disasmTabBetweenMnemonicAndArguments = false;
     settings.disasmNoCurrentModuleText = false;
     settings.disasm0xPrefixValues = false;
+    settings.disasmNoBranchDisasmPreview = false;
     settings.disasmNoSourceLineAutoComments = false;
     settings.disasmMaxModuleSize = -1;
     settings.guiNoForegroundWindow = true;
@@ -147,6 +149,8 @@ void SettingsDialog::LoadSettings()
     GetSettingBool("Engine", "NoWow64SingleStepWorkaround", &settings.engineNoWow64SingleStepWorkaround);
     if(BridgeSettingGetUint("Engine", "MaxTraceCount", &cur))
         settings.engineMaxTraceCount = int(cur);
+    if(BridgeSettingGetUint("Engine", "AnimateInterval", &cur))
+        settings.engineAnimateInterval = int(cur);
     switch(settings.engineCalcType)
     {
     case calc_signed:
@@ -181,6 +185,7 @@ void SettingsDialog::LoadSettings()
     ui->chkVerboseExceptionLogging->setChecked(settings.engineVerboseExceptionLogging);
     ui->chkNoWow64SingleStepWorkaround->setChecked(settings.engineNoWow64SingleStepWorkaround);
     ui->spinMaxTraceCount->setValue(settings.engineMaxTraceCount);
+    ui->spinAnimateInterval->setValue(settings.engineAnimateInterval);
 
     //Exceptions tab
     char exceptionRange[MAX_SETTING_SIZE] = "";
@@ -213,6 +218,7 @@ void SettingsDialog::LoadSettings()
     GetSettingBool("Disassembler", "PermanentHighlightingMode", &settings.disasmPermanentHighlightingMode);
     GetSettingBool("Disassembler", "NoCurrentModuleText", &settings.disasmNoCurrentModuleText);
     GetSettingBool("Disassembler", "0xPrefixValues", &settings.disasm0xPrefixValues);
+    GetSettingBool("Disassembler", "NoBranchDisasmPreview", &settings.disasmNoBranchDisasmPreview);
     GetSettingBool("Disassembler", "NoSourceLineAutoComments", &settings.disasmNoSourceLineAutoComments);
     if(BridgeSettingGetUint("Disassembler", "MaxModuleSize", &cur))
         settings.disasmMaxModuleSize = int(cur);
@@ -227,6 +233,7 @@ void SettingsDialog::LoadSettings()
     ui->chkPermanentHighlightingMode->setChecked(settings.disasmPermanentHighlightingMode);
     ui->chkNoCurrentModuleText->setChecked(settings.disasmNoCurrentModuleText);
     ui->chk0xPrefixValues->setChecked(settings.disasm0xPrefixValues);
+    ui->chkNoBranchDisasmPreview->setChecked(settings.disasmNoBranchDisasmPreview);
     ui->chkNoSourceLinesAutoComments->setChecked(settings.disasmNoSourceLineAutoComments);
     ui->spinMaximumModuleNameSize->setValue(settings.disasmMaxModuleSize);
 
@@ -234,7 +241,7 @@ void SettingsDialog::LoadSettings()
     GetSettingBool("Gui", "FpuRegistersLittleEndian", &settings.guiFpuRegistersLittleEndian);
     GetSettingBool("Gui", "SaveColumnOrder", &settings.guiSaveColumnOrder);
     GetSettingBool("Gui", "NoCloseDialog", &settings.guiNoCloseDialog);
-    GetSettingBool("Gui", "PidInHex", &settings.guiPidInHex);
+    GetSettingBool("Gui", "PidTidInHex", &settings.guiPidTidInHex);
     GetSettingBool("Gui", "SidebarWatchLabels", &settings.guiSidebarWatchLabels);
     GetSettingBool("Gui", "NoForegroundWindow", &settings.guiNoForegroundWindow);
     GetSettingBool("Gui", "LoadSaveTabOrder", &settings.guiLoadSaveTabOrder);
@@ -246,7 +253,7 @@ void SettingsDialog::LoadSettings()
     ui->chkFpuRegistersLittleEndian->setChecked(settings.guiFpuRegistersLittleEndian);
     ui->chkSaveColumnOrder->setChecked(settings.guiSaveColumnOrder);
     ui->chkNoCloseDialog->setChecked(settings.guiNoCloseDialog);
-    ui->chkPidInHex->setChecked(settings.guiPidInHex);
+    ui->chkPidTidInHex->setChecked(settings.guiPidTidInHex);
     ui->chkSidebarWatchLabels->setChecked(settings.guiSidebarWatchLabels);
     ui->chkNoForegroundWindow->setChecked(settings.guiNoForegroundWindow);
     ui->chkSaveLoadTabOrder->setChecked(settings.guiLoadSaveTabOrder);
@@ -356,6 +363,7 @@ void SettingsDialog::SaveSettings()
     BridgeSettingSetUint("Engine", "NoScriptTimeout", settings.engineNoScriptTimeout);
     BridgeSettingSetUint("Engine", "IgnoreInconsistentBreakpoints", settings.engineIgnoreInconsistentBreakpoints);
     BridgeSettingSetUint("Engine", "MaxTraceCount", settings.engineMaxTraceCount);
+    BridgeSettingSetUint("Engine", "AnimateInterval", settings.engineAnimateInterval);
     BridgeSettingSetUint("Engine", "VerboseExceptionLogging", settings.engineVerboseExceptionLogging);
     BridgeSettingSetUint("Engine", "HardcoreThreadSwitchWarning", settings.engineHardcoreThreadSwitchWarning);
     BridgeSettingSetUint("Engine", "NoWow64SingleStepWorkaround", settings.engineNoWow64SingleStepWorkaround);
@@ -382,6 +390,7 @@ void SettingsDialog::SaveSettings()
     BridgeSettingSetUint("Disassembler", "PermanentHighlightingMode", settings.disasmPermanentHighlightingMode);
     BridgeSettingSetUint("Disassembler", "NoCurrentModuleText", settings.disasmNoCurrentModuleText);
     BridgeSettingSetUint("Disassembler", "0xPrefixValues", settings.disasm0xPrefixValues);
+    BridgeSettingSetUint("Disassembler", "NoBranchDisasmPreview", settings.disasmNoBranchDisasmPreview);
     BridgeSettingSetUint("Disassembler", "NoSourceLineAutoComments", settings.disasmNoSourceLineAutoComments);
     BridgeSettingSetUint("Disassembler", "MaxModuleSize", settings.disasmMaxModuleSize);
 
@@ -389,7 +398,7 @@ void SettingsDialog::SaveSettings()
     BridgeSettingSetUint("Gui", "FpuRegistersLittleEndian", settings.guiFpuRegistersLittleEndian);
     BridgeSettingSetUint("Gui", "SaveColumnOrder", settings.guiSaveColumnOrder);
     BridgeSettingSetUint("Gui", "NoCloseDialog", settings.guiNoCloseDialog);
-    BridgeSettingSetUint("Gui", "PidInHex", settings.guiPidInHex);
+    BridgeSettingSetUint("Gui", "PidTidInHex", settings.guiPidTidInHex);
     BridgeSettingSetUint("Gui", "SidebarWatchLabels", settings.guiSidebarWatchLabels);
     BridgeSettingSetUint("Gui", "NoForegroundWindow", settings.guiNoForegroundWindow);
     BridgeSettingSetUint("Gui", "LoadSaveTabOrder", settings.guiLoadSaveTabOrder);
@@ -445,6 +454,11 @@ void SettingsDialog::SaveSettings()
     {
         emit Config()->asciiAddressDumpModeUpdated();
         bAsciiAddressDumpModeUpdated = false;
+    }
+    if(bGuiOptionsUpdated)
+    {
+        emit Config()->guiOptionsUpdated();
+        bGuiOptionsUpdated = false;
     }
     DbgSettingsUpdated();
     GuiUpdateAllViews();
@@ -797,9 +811,9 @@ void SettingsDialog::on_chkSkipInt3Stepping_toggled(bool checked)
     settings.engineSkipInt3Stepping = checked;
 }
 
-void SettingsDialog::on_chkPidInHex_clicked(bool checked)
+void SettingsDialog::on_chkPidTidInHex_clicked(bool checked)
 {
-    settings.guiPidInHex = checked;
+    settings.guiPidTidInHex = checked;
 }
 
 void SettingsDialog::on_chkNoScriptTimeout_stateChanged(int arg1)
@@ -825,6 +839,11 @@ void SettingsDialog::on_chkNoForegroundWindow_toggled(bool checked)
 void SettingsDialog::on_spinMaxTraceCount_valueChanged(int arg1)
 {
     settings.engineMaxTraceCount = arg1;
+}
+
+void SettingsDialog::on_spinAnimateInterval_valueChanged(int arg1)
+{
+    settings.engineAnimateInterval = arg1;
 }
 
 void SettingsDialog::on_chkNoHighlightOperands_toggled(bool checked)
@@ -859,6 +878,12 @@ void SettingsDialog::on_chk0xPrefixValues_toggled(bool checked)
 {
     bTokenizerConfigUpdated = true;
     settings.disasm0xPrefixValues = checked;
+}
+
+void SettingsDialog::on_chkNoBranchDisasmPreview_toggled(bool checked)
+{
+    bGuiOptionsUpdated = true;
+    settings.disasmNoBranchDisasmPreview = checked;
 }
 
 void SettingsDialog::on_chkNoSourceLinesAutoComments_toggled(bool checked)

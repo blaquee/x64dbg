@@ -18,12 +18,27 @@ std::map<BreakpointKey, BREAKPOINT> breakpoints;
 
 static void setBpActive(BREAKPOINT & bp)
 {
-    if(bp.type == BPHARDWARE) //TODO: properly implement this (check debug registers)
+    // DLL/Exception breakpoints are always enabled
+    if(bp.type == BPDLL || bp.type == BPEXCEPTION)
+    {
         bp.active = true;
-    else if(bp.type == BPDLL || bp.type == BPEXCEPTION)
-        bp.active = true;
-    else
+        return;
+    }
+
+    // Breakpoints without modules need a valid address
+    if(!*bp.mod)
+    {
         bp.active = MemIsValidReadPtr(bp.addr);
+        return;
+    }
+    else
+    {
+        auto modLoaded = ModBaseFromName(bp.mod) != 0;
+        if(bp.type == BPHARDWARE)
+            bp.active = modLoaded;
+        else
+            bp.active = modLoaded && MemIsValidReadPtr(bp.addr);
+    }
 }
 
 BREAKPOINT* BpInfoFromAddr(BP_TYPE Type, duint Address)
@@ -173,26 +188,6 @@ bool BpGet(duint Address, BP_TYPE Type, const char* Name, BREAKPOINT* Bp)
         return true;
     }
 
-    // Do a lookup by breakpoint name
-    for(auto & i : breakpoints)
-    {
-        // Do the names match?
-        if(_stricmp(Name, i.second.name) != 0)
-            continue;
-
-        // Fill out the optional user buffer
-        if(Bp)
-        {
-            *Bp = i.second;
-            if(i.second.type != BPDLL && i.second.type != BPEXCEPTION)
-                Bp->addr += ModBaseFromAddr(Address);
-            setBpActive(*Bp);
-        }
-
-        // Return true if the name was found at all
-        return true;
-    }
-
     // If name in a special format "libwinpthread-1.dll":$7792, find the breakpoint even if the DLL might not be loaded yet.
     const char* separatorPos;
     separatorPos = strstr(Name, ":$"); //DLL file names cannot contain ":" char anyway, so ignoring the quotes is fine. The following part of RVA expression might contain ":$"?
@@ -240,6 +235,29 @@ bool BpGet(duint Address, BP_TYPE Type, const char* Name, BREAKPOINT* Bp)
         }
         free(DLLName);
     }
+
+    // Do a lookup by breakpoint name
+    for(auto & i : breakpoints)
+    {
+        // Breakpoint name match
+        if(_stricmp(Name, i.second.name) != 0)
+            // Module name match in case of DLL Breakpoints
+            if(i.second.type != BPDLL || _stricmp(Name, i.second.mod) != 0)
+                continue;
+
+        // Fill out the optional user buffer
+        if(Bp)
+        {
+            *Bp = i.second;
+            if(i.second.type != BPDLL && i.second.type != BPEXCEPTION)
+                Bp->addr += ModBaseFromAddr(Address);
+            setBpActive(*Bp);
+        }
+
+        // Return true if the name was found at all
+        return true;
+    }
+
     return false;
 }
 
@@ -283,6 +301,7 @@ bool BpUpdateDllPath(const char* module1, BREAKPOINT** newBpInfo)
                 BREAKPOINT temp;
                 temp = bpRef;
                 strcpy_s(temp.mod, module1);
+                _strlwr_s(temp.mod, strlen(temp.mod) + 1);
                 temp.addr = ModHashFromName(module1);
                 breakpoints.erase(i.first);
                 auto newItem = breakpoints.insert(std::make_pair(BreakpointKey(BPDLL, temp.addr), temp));
@@ -299,6 +318,7 @@ bool BpUpdateDllPath(const char* module1, BREAKPOINT** newBpInfo)
                 BREAKPOINT temp;
                 temp = bpRef;
                 strcpy_s(temp.mod, dashPos1 + 1);
+                _strlwr_s(temp.mod, strlen(temp.mod) + 1);
                 temp.addr = ModHashFromName(dashPos1 + 1);
                 breakpoints.erase(i.first);
                 auto newItem = breakpoints.insert(std::make_pair(BreakpointKey(BPDLL, temp.addr), temp));
@@ -688,6 +708,21 @@ void BpToBridge(const BREAKPOINT* Bp, BRIDGEBP* BridgeBp)
         break;
     case BPMEMORY:
         BridgeBp->type = bp_memory;
+        switch(Bp->titantype)
+        {
+        case UE_MEMORY_READ:
+            BridgeBp->typeEx = mem_read;
+            break;
+        case UE_MEMORY_WRITE:
+            BridgeBp->typeEx = mem_write;
+            break;
+        case UE_MEMORY_EXECUTE:
+            BridgeBp->typeEx = mem_execute;
+            break;
+        case UE_MEMORY:
+            BridgeBp->typeEx = mem_access;
+            break;
+        }
         break;
     case BPDLL:
         BridgeBp->type = bp_dll;
@@ -718,7 +753,7 @@ void BpToBridge(const BREAKPOINT* Bp, BRIDGEBP* BridgeBp)
             BridgeBp->typeEx = ex_all;
             break;
         default:
-            __debugbreak();
+            dprintf_untranslated("Invalid titantype for exception breakpoint %u\n", Bp->titantype);
         }
         break;
     default:
@@ -808,6 +843,8 @@ void BpCacheLoad(JSON Root)
         breakpoint.addr = (duint)json_hex_value(json_object_get(value, "address"));
         breakpoint.enabled = json_boolean_value(json_object_get(value, "enabled"));
         breakpoint.titantype = (DWORD)json_hex_value(json_object_get(value, "titantype"));
+        if(breakpoint.type == BPHARDWARE)
+            TITANSETDRX(breakpoint.titantype, UE_DR7); // DR7 is used as a sentinel value to prevent wrongful deletion
 
         // String values
         loadStringValue(value, breakpoint.name, "name");

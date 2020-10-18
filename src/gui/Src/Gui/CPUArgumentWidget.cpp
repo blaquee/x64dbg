@@ -32,6 +32,7 @@ CPUArgumentWidget::CPUArgumentWidget(QWidget* parent) :
     connect(mFollowAddrStack, SIGNAL(triggered()), this, SLOT(followStackSlot()));
 
     connect(Bridge::getBridge(), SIGNAL(repaintTableView()), this, SLOT(refreshData()));
+    connect(Bridge::getBridge(), SIGNAL(disassembleAt(dsint, dsint)), this, SLOT(disassembleAtSlot(dsint, dsint)));
 }
 
 CPUArgumentWidget::~CPUArgumentWidget()
@@ -45,8 +46,9 @@ void CPUArgumentWidget::updateStackOffset(bool iscall)
     mStackOffset = cur.getStackOffset() + (iscall ? 0 : cur.getCallOffset());
 }
 
-void CPUArgumentWidget::disassembledAtSlot(dsint, dsint cip, bool, dsint)
+void CPUArgumentWidget::disassembleAtSlot(dsint addr, dsint cip)
 {
+    Q_UNUSED(addr);
     if(mCurrentCallingConvention == -1) //no calling conventions
     {
         mTable->setRowCount(0);
@@ -178,7 +180,7 @@ void CPUArgumentWidget::followDisasmSlot()
     QAction* action = qobject_cast<QAction*>(sender());
     if(!action)
         return;
-    DbgCmdExec(QString("disasm \"%1\"").arg(action->objectName()).toUtf8().constData());
+    DbgCmdExec(QString("disasm \"%1\"").arg(action->objectName()));
 }
 
 void CPUArgumentWidget::followDumpSlot()
@@ -186,7 +188,7 @@ void CPUArgumentWidget::followDumpSlot()
     QAction* action = qobject_cast<QAction*>(sender());
     if(!action)
         return;
-    DbgCmdExec(QString("dump \"%1\"").arg(action->objectName()).toUtf8().constData());
+    DbgCmdExec(QString("dump \"%1\"").arg(action->objectName()));
 }
 
 void CPUArgumentWidget::followStackSlot()
@@ -194,7 +196,7 @@ void CPUArgumentWidget::followStackSlot()
     QAction* action = qobject_cast<QAction*>(sender());
     if(!action)
         return;
-    DbgCmdExec(QString("sdump \"%1\"").arg(action->objectName()).toUtf8().constData());
+    DbgCmdExec(QString("sdump \"%1\"").arg(action->objectName()));
 }
 
 void CPUArgumentWidget::loadConfig()
@@ -236,8 +238,6 @@ void CPUArgumentWidget::loadConfig()
 void CPUArgumentWidget::setupTable()
 {
     connect(mTable, SIGNAL(contextMenuSignal(QPoint)), this, SLOT(contextMenuSlot(QPoint)));
-    mTable->verticalScrollBar()->setStyleSheet(ConfigVScrollBarStyle());
-    mTable->horizontalScrollBar()->setStyleSheet(ConfigHScrollBarStyle());
     mTable->enableMultiSelection(false);
     mTable->setShowHeader(false);
     mTable->addColumnAt(0, "", false);

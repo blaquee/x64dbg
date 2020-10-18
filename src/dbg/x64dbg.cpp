@@ -403,6 +403,7 @@ static void registercommands()
     dbgcmdnew("AddFavouriteToolShortcut,SetFavouriteToolShortcut", cbInstrSetFavToolShortcut, false); //set favourite tool shortcut
     dbgcmdnew("FoldDisassembly", cbInstrFoldDisassembly, true); //fold disassembly segment
     dbgcmdnew("guiupdatetitle", cbDebugUpdateTitle, true); // set relevant disassembly title
+    dbgcmdnew("showref", cbShowReferences, false); // show references window
 
     //misc
     dbgcmdnew("chd", cbInstrChd, false); //Change directory
@@ -442,6 +443,8 @@ static void registercommands()
     dbgcmdnew("printstack,logstack", cbInstrPrintStack, true); //print the call stack
     dbgcmdnew("flushlog", cbInstrFlushlog, false); //flush the log
     dbgcmdnew("AnimateWait", cbInstrAnimateWait, true); //Wait for the debuggee to pause.
+    dbgcmdnew("dbdecompress", cbInstrDbdecompress, false); //Decompress a database.
+    dbgcmdnew("DebugFlags", cbInstrDebugFlags, false); //Set ntdll LdrpDebugFlags
 };
 
 bool cbCommandProvider(char* cmd, int maxlen)
@@ -615,21 +618,64 @@ static WString escape(WString cmdline)
     return cmdline;
 }
 
+#include <delayimp.h>
+
+// https://devblogs.microsoft.com/oldnewthing/20170126-00/?p=95265
+static FARPROC WINAPI delayHook(unsigned dliNotify, PDelayLoadInfo pdli)
+{
+    if(dliNotify == dliNotePreLoadLibrary && _stricmp(pdli->szDll, "TitanEngine.dll") == 0)
+    {
+        String fullPath = szProgramDir;
+        fullPath += '\\';
+
+        switch(DbgGetDebugEngine())
+        {
+        case DebugEngineGleeBug:
+            fullPath += "GleeBug\\TitanEngine.dll";
+            break;
+        case DebugEngineStaticEngine:
+            fullPath += "StaticEngine\\TitanEngine.dll";
+            break;
+        case DebugEngineTitanEngine:
+        default:
+            return 0;
+        }
+
+        auto hModule = LoadLibraryW(StringUtils::Utf8ToUtf16(fullPath).c_str());
+        if(hModule)
+        {
+            dprintf(QT_TRANSLATE_NOOP("DBG", "Successfully loaded %s!\n"), fullPath.c_str());
+        }
+        else
+        {
+            dprintf(QT_TRANSLATE_NOOP("DBG", "Failed to load %s, falling back to regular TitanEngine.dll"), fullPath.c_str());
+        }
+        return (FARPROC)hModule;
+    }
+
+    return 0;
+}
+
+// Visual Studio 2015 Update 3 made this const per default
+// https://dev.to/yumetodo/list-of-mscver-and-mscfullver-8nd
+#if _MSC_FULL_VER >= 190024210
+const
+#endif // _MSC_FULL_VER
+PfnDliHook __pfnDliNotifyHook2 = delayHook;
+
 extern "C" DLL_EXPORT const char* _dbg_dbginit()
 {
+    if(!*szProgramDir)
+        return "GetModuleFileNameW failed!";
+
     if(!EngineCheckStructAlignment(UE_STRUCT_TITAN_ENGINE_CONTEXT, sizeof(TITAN_ENGINE_CONTEXT_t)))
         return "Invalid TITAN_ENGINE_CONTEXT_t alignment!";
 
     static_assert(sizeof(TITAN_ENGINE_CONTEXT_t) == sizeof(REGISTERCONTEXT), "Invalid REGISTERCONTEXT alignment!");
 
-    wchar_t wszDir[deflen] = L"";
-    if(!GetModuleFileNameW(hInst, wszDir, deflen))
-        return "GetModuleFileNameW failed!";
-    strcpy_s(szProgramDir, StringUtils::Utf16ToUtf8(wszDir).c_str());
-    int len = (int)strlen(szProgramDir);
-    while(szProgramDir[len] != '\\')
-        len--;
-    szProgramDir[len] = 0;
+    strcpy_s(szDllLoaderPath, szProgramDir);
+    strcat_s(szDllLoaderPath, "\\loaddll.exe");
+
 #ifdef ENABLE_MEM_TRACE
     strcpy_s(alloctrace, szProgramDir);
     strcat_s(alloctrace, "\\alloctrace.txt");

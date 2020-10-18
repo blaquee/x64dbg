@@ -54,9 +54,10 @@ public:
     void setCopyMenuOnly(bool bSet, bool bDebugOnly = true);
 
     //draw helpers
-    void setHighlightText(QString highlightText)
+    void setHighlightText(QString highlightText, int minCol = 0)
     {
         mHighlightText = highlightText;
+        mMinimumHighlightColumn = minCol;
     }
 
     void setAddressColumn(int col, bool cipBase = false)
@@ -89,6 +90,7 @@ public slots:
     void copyTableToLogSlot();
     void copyTableResizeToLogSlot();
     void copyEntrySlot();
+    void exportTableSlot();
     void contextMenuRequestedSlot(const QPoint & pos);
     void headerButtonPressedSlot(int col);
 
@@ -141,7 +143,16 @@ protected:
     QColor mTracedSelectedAddressBackgroundColor;
     bool bCipBase = false;
     QString mHighlightText;
+    int mMinimumHighlightColumn = 0;
     int mAddressColumn = -1;
     bool bAddressLabel = true;
     bool bDisassemblyPopupEnabled = true;
+
+    QAction* mCopyLine;
+    QAction* mCopyTable;
+    QAction* mCopyTableResize;
+    QAction* mCopyLineToLog;
+    QAction* mCopyTableToLog;
+    QAction* mCopyTableResizeToLog;
+    QAction* mExportTableCSV;
 };

@@ -84,10 +84,10 @@ void CallStackView::updateCallStack()
         int party = DbgFunctions()->ModGetParty(callstack.entries[i].to);
         switch(party)
         {
-        case 0:
+        case mod_user:
             setCellContent(i, 5, tr("User"));
             break;
-        case 1:
+        case mod_system:
             setCellContent(i, 5, tr("System"));
             break;
         default:
@@ -111,19 +111,19 @@ void CallStackView::contextMenuSlot(const QPoint pos)
 void CallStackView::followAddress()
 {
     QString addrText = getCellContent(getInitialSelection(), 0);
-    DbgCmdExecDirect(QString("sdump " + addrText).toUtf8().constData());
+    DbgCmdExecDirect(QString("sdump " + addrText));
 }
 
 void CallStackView::followTo()
 {
     QString addrText = getCellContent(getInitialSelection(), 1);
-    DbgCmdExecDirect(QString("disasm " + addrText).toUtf8().constData());
+    DbgCmdExecDirect(QString("disasm " + addrText));
 }
 
 void CallStackView::followFrom()
 {
     QString addrText = getCellContent(getInitialSelection(), 2);
-    DbgCmdExecDirect(QString("disasm " + addrText).toUtf8().constData());
+    DbgCmdExecDirect(QString("disasm " + addrText));
 }
 
 void CallStackView::showSuspectedCallStack()

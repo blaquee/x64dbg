@@ -3,7 +3,6 @@
 #include <QToolTip>
 #include <stdint.h>
 #include "RegistersView.h"
-#include "CPUWidget.h"
 #include "CPUDisassembly.h"
 #include "CPUMultiDump.h"
 #include "Configuration.h"
@@ -203,13 +202,12 @@ void RegistersView::InitMappings()
 
     if(mShowFpu)
     {
-
+        REGISTER_NAME tempRegisterName;
         offset++;
 
-        if(mFpuMode)
+        if(mFpuMode == 1)
         {
-            mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, x87r0));
-            mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, x87r0, DS, x87r0));
+            tempRegisterName = x87r0;
 
             mRegisterMapping.insert(x87r0, "x87r0");
             mRegisterPlaces.insert(x87r0, Register_Position(offset++, 0, 6, 10 * 2));
@@ -237,10 +235,9 @@ void RegistersView::InitMappings()
             mRegisterRelativePlaces.insert(x87r7, Register_Relative_Position(x87r6, x87TagWord));
 
         }
-        else
+        else if(mFpuMode == 0)
         {
-            mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, x87st0));
-            mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, x87st0, DS, x87st0));
+            tempRegisterName = x87st0;
 
             mRegisterMapping.insert(x87st0, "ST(0)");
             mRegisterPlaces.insert(x87st0, Register_Position(offset++, 0, 6, 10 * 2));
@@ -268,21 +265,56 @@ void RegistersView::InitMappings()
             mRegisterRelativePlaces.insert(x87st7, Register_Relative_Position(x87st6, x87TagWord));
 
         }
+        else if(mFpuMode == 2)
+        {
+            tempRegisterName = MM0;
+
+            mRegisterMapping.insert(MM0, "MM0");
+            mRegisterPlaces.insert(MM0, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM0, Register_Relative_Position(SS, MM1));
+            mRegisterMapping.insert(MM1, "MM1");
+            mRegisterPlaces.insert(MM1, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM1, Register_Relative_Position(MM0, MM2));
+            mRegisterMapping.insert(MM2, "MM2");
+            mRegisterPlaces.insert(MM2, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM2, Register_Relative_Position(MM1, MM3));
+            mRegisterMapping.insert(MM3, "MM3");
+            mRegisterPlaces.insert(MM3, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM3, Register_Relative_Position(MM2, MM4));
+            mRegisterMapping.insert(MM4, "MM4");
+            mRegisterPlaces.insert(MM4, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM4, Register_Relative_Position(MM3, MM5));
+            mRegisterMapping.insert(MM5, "MM5");
+            mRegisterPlaces.insert(MM5, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM5, Register_Relative_Position(MM4, MM6));
+            mRegisterMapping.insert(MM6, "MM6");
+            mRegisterPlaces.insert(MM6, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM6, Register_Relative_Position(MM5, MM7));
+            mRegisterMapping.insert(MM7, "MM7");
+            mRegisterPlaces.insert(MM7, Register_Position(offset++, 0, 4, 8 * 2));
+            mRegisterRelativePlaces.insert(MM7, Register_Relative_Position(MM6, x87TagWord));
+        }
+        mRegisterRelativePlaces.insert(CS, Register_Relative_Position(DS, SS, ES, tempRegisterName));
+        mRegisterRelativePlaces.insert(SS, Register_Relative_Position(CS, tempRegisterName, DS, tempRegisterName));
 
         offset++;
 
         mRegisterMapping.insert(x87TagWord, "x87TagWord");
         mRegisterPlaces.insert(x87TagWord, Register_Position(offset++, 0, 11, sizeof(WORD) * 2));
 
-        if(mFpuMode)
+        switch(mFpuMode)
         {
-            mRegisterRelativePlaces.insert(x87TagWord, Register_Relative_Position(x87r7, x87TW_0));
+        case 0:
+            tempRegisterName = x87st7;
+            break;
+        case 1:
+            tempRegisterName = x87r7;
+            break;
+        case 2:
+            tempRegisterName = MM7;
+            break;
         }
-        else
-        {
-            mRegisterRelativePlaces.insert(x87TagWord, Register_Relative_Position(x87st7, x87TW_0));
-        }
-
+        mRegisterRelativePlaces.insert(x87TagWord, Register_Relative_Position(tempRegisterName, x87TW_0));
 
         //Special treatment of long internationalized string
         int NextColumnPosition = 20;
@@ -463,48 +495,19 @@ void RegistersView::InitMappings()
 
         mRegisterMapping.insert(MxCsr_IE, "MxCsr_IE");
         mRegisterPlaces.insert(MxCsr_IE, Register_Position(offset, 0, 9, 1));
-        mRegisterRelativePlaces.insert(MxCsr_IE, Register_Relative_Position(MxCsr_DE, MxCsr_DM, MxCsr_OE, MM0));
+        mRegisterRelativePlaces.insert(MxCsr_IE, Register_Relative_Position(MxCsr_DE, MxCsr_DM, MxCsr_OE, XMM0));
         mRegisterMapping.insert(MxCsr_DM, "MxCsr_DM");
         mRegisterPlaces.insert(MxCsr_DM, Register_Position(offset, 12, 10, 1));
-        mRegisterRelativePlaces.insert(MxCsr_DM, Register_Relative_Position(MxCsr_IE, MxCsr_RC, MxCsr_ZE, MM0));
+        mRegisterRelativePlaces.insert(MxCsr_DM, Register_Relative_Position(MxCsr_IE, MxCsr_RC, MxCsr_ZE, XMM0));
         mRegisterMapping.insert(MxCsr_RC, "MxCsr_RC");
         mRegisterPlaces.insert(MxCsr_RC, Register_Position(offset++, 25, 10, 19));
-        mRegisterRelativePlaces.insert(MxCsr_RC, Register_Relative_Position(MxCsr_DM, MM0, MxCsr_DE, MM0));
-
-
-        offset++;
-
-        mRegisterMapping.insert(MM0, "MM0");
-        mRegisterPlaces.insert(MM0, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM0, Register_Relative_Position(MxCsr_RC, MM1));
-        mRegisterMapping.insert(MM1, "MM1");
-        mRegisterPlaces.insert(MM1, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM1, Register_Relative_Position(MM0, MM2));
-        mRegisterMapping.insert(MM2, "MM2");
-        mRegisterPlaces.insert(MM2, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM2, Register_Relative_Position(MM1, MM3));
-        mRegisterMapping.insert(MM3, "MM3");
-        mRegisterPlaces.insert(MM3, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM3, Register_Relative_Position(MM2, MM4));
-        mRegisterMapping.insert(MM4, "MM4");
-        mRegisterPlaces.insert(MM4, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM4, Register_Relative_Position(MM3, MM5));
-        mRegisterMapping.insert(MM5, "MM5");
-        mRegisterPlaces.insert(MM5, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM5, Register_Relative_Position(MM4, MM6));
-        mRegisterMapping.insert(MM6, "MM6");
-        mRegisterPlaces.insert(MM6, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM6, Register_Relative_Position(MM5, MM7));
-        mRegisterMapping.insert(MM7, "MM7");
-        mRegisterPlaces.insert(MM7, Register_Position(offset++, 0, 4, 8 * 2));
-        mRegisterRelativePlaces.insert(MM7, Register_Relative_Position(MM6, XMM0));
-
+        mRegisterRelativePlaces.insert(MxCsr_RC, Register_Relative_Position(MxCsr_DM, XMM0, MxCsr_DE, XMM0));
 
         offset++;
 
         mRegisterMapping.insert(XMM0, "XMM0");
         mRegisterPlaces.insert(XMM0, Register_Position(offset++, 0, 6, 16 * 2));
-        mRegisterRelativePlaces.insert(XMM0, Register_Relative_Position(MM7, XMM1));
+        mRegisterRelativePlaces.insert(XMM0, Register_Relative_Position(MxCsr_RC, XMM1));
         mRegisterMapping.insert(XMM1, "XMM1");
         mRegisterPlaces.insert(XMM1, Register_Position(offset++, 0, 6, 16 * 2));
         mRegisterRelativePlaces.insert(XMM1, Register_Relative_Position(XMM0, XMM2));
@@ -678,155 +681,12 @@ static QAction* setupAction(const QString & text, RegistersView* this_object)
     return action;
 }
 
-RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollOffset(0), mParent(parent)
+RegistersView::RegistersView(QWidget* parent) : QScrollArea(parent), mVScrollOffset(0)
 {
     setWindowTitle("Registers");
     mChangeViewButton = NULL;
-    connect(Bridge::getBridge(), SIGNAL(close()), this, SLOT(onClose()));
-    switch(ConfigUint("Gui", "SIMDRegistersDisplayMode"))
-    {
-    default:
-    case 0:
-        wSIMDRegDispMode = SIMD_REG_DISP_HEX;
-        break;
-    case 1:
-        wSIMDRegDispMode = SIMD_REG_DISP_FLOAT;
-        break;
-    case 2:
-        wSIMDRegDispMode = SIMD_REG_DISP_DOUBLE;
-        break;
-    case 3:
-        wSIMDRegDispMode = SIMD_REG_DISP_WORD_SIGNED;
-        break;
-    case 4:
-        wSIMDRegDispMode = SIMD_REG_DISP_DWORD_SIGNED;
-        break;
-    case 5:
-        wSIMDRegDispMode = SIMD_REG_DISP_QWORD_SIGNED;
-        break;
-    case 6:
-        wSIMDRegDispMode = SIMD_REG_DISP_WORD_UNSIGNED;
-        break;
-    case 7:
-        wSIMDRegDispMode = SIMD_REG_DISP_DWORD_UNSIGNED;
-        break;
-    case 8:
-        wSIMDRegDispMode = SIMD_REG_DISP_QWORD_UNSIGNED;
-        break;
-    case 9:
-        wSIMDRegDispMode = SIMD_REG_DISP_WORD_HEX;
-        break;
-    case 10:
-        wSIMDRegDispMode = SIMD_REG_DISP_DWORD_HEX;
-        break;
-    case 11:
-        wSIMDRegDispMode = SIMD_REG_DISP_QWORD_HEX;
-        break;
-    }
-    mFpuMode = false;
-
-    // precreate ContextMenu Actions
-    wCM_Increment = setupAction(DIcon("register_inc.png"), tr("Increment"), this);
-    wCM_Decrement = setupAction(DIcon("register_dec.png"), tr("Decrement"), this);
-    wCM_Zero = setupAction(DIcon("register_zero.png"), tr("Zero"), this);
-    wCM_SetToOne = setupAction(DIcon("register_one.png"), tr("Set to 1"), this);
-    wCM_Modify = new QAction(DIcon("register_edit.png"), tr("Modify value"), this);
-    wCM_Modify->setShortcut(QKeySequence(Qt::Key_Enter));
-    wCM_ToggleValue = setupAction(DIcon("register_toggle.png"), tr("Toggle"), this);
-    wCM_Undo = setupAction(DIcon("undo.png"), tr("Undo"), this);
-    wCM_CopyToClipboard = setupAction(DIcon("copy.png"), tr("Copy value"), this);
-    wCM_CopyFloatingPointValueToClipboard = setupAction(DIcon("copy.png"), tr("Copy floating point value"), this);
-    wCM_CopySymbolToClipboard = setupAction(DIcon("pdb.png"), tr("Copy Symbol Value"), this);
-    wCM_CopyAll = setupAction(DIcon("copy-alt.png"), tr("Copy all registers"), this);
-    wCM_FollowInDisassembly = new QAction(DIcon(QString("processor%1.png").arg(ArchValue("32", "64"))), tr("Follow in Disassembler"), this);
-    wCM_FollowInDump = new QAction(DIcon("dump.png"), tr("Follow in Dump"), this);
-    wCM_FollowInStack = new QAction(DIcon("stack.png"), tr("Follow in Stack"), this);
-    wCM_FollowInMemoryMap = new QAction(DIcon("memmap_find_address_page"), tr("Follow in Memory Map"), this);
-    wCM_Incrementx87Stack = setupAction(DIcon("arrow-small-down.png"), tr("Increment x87 Stack"), this);
-    wCM_Decrementx87Stack = setupAction(DIcon("arrow-small-up.png"), tr("Decrement x87 Stack"), this);
-    wCM_ChangeFPUView = new QAction(DIcon("change-view.png"), tr("Change view"), this);
-    wCM_IncrementPtrSize = setupAction(DIcon("register_inc.png"), ArchValue(tr("Increase 4"), tr("Increase 8")), this);
-    wCM_DecrementPtrSize = setupAction(DIcon("register_dec.png"), ArchValue(tr("Decrease 4"), tr("Decrease 8")), this);
-    wCM_Push = setupAction(DIcon("arrow-small-down.png"), tr("Push"), this);
-    wCM_Pop = setupAction(DIcon("arrow-small-up.png"), tr("Pop"), this);
-    wCM_Highlight = setupAction(DIcon("highlight.png"), tr("Highlight"), this);
-    mSwitchSIMDDispMode = new QMenu(tr("Change SIMD Register Display Mode"), this);
-    mSwitchSIMDDispMode->setIcon(DIcon("simdmode.png"));
-    mSwitchFPUDispMode = new QAction(tr("Display ST(x)"), this);
-    mSwitchFPUDispMode->setCheckable(true);
-    SIMDHex = new QAction(tr("Hexadecimal"), mSwitchSIMDDispMode);
-    SIMDFloat = new QAction(tr("Float"), mSwitchSIMDDispMode);
-    SIMDDouble = new QAction(tr("Double"), mSwitchSIMDDispMode);
-    SIMDSWord = new QAction(tr("Signed Word"), mSwitchSIMDDispMode);
-    SIMDSDWord = new QAction(tr("Signed DWord"), mSwitchSIMDDispMode);
-    SIMDSQWord = new QAction(tr("Signed QWord"), mSwitchSIMDDispMode);
-    SIMDUWord = new QAction(tr("Unsigned Word"), mSwitchSIMDDispMode);
-    SIMDUDWord = new QAction(tr("Unsigned DWord"), mSwitchSIMDDispMode);
-    SIMDUQWord = new QAction(tr("Unsigned QWord"), mSwitchSIMDDispMode);
-    SIMDHWord = new QAction(tr("Hexadecimal Word"), mSwitchSIMDDispMode);
-    SIMDHDWord = new QAction(tr("Hexadecimal DWord"), mSwitchSIMDDispMode);
-    SIMDHQWord = new QAction(tr("Hexadecimal QWord"), mSwitchSIMDDispMode);
-    SIMDHex->setData(QVariant(SIMD_REG_DISP_HEX));
-    SIMDFloat->setData(QVariant(SIMD_REG_DISP_FLOAT));
-    SIMDDouble->setData(QVariant(SIMD_REG_DISP_DOUBLE));
-    SIMDSWord->setData(QVariant(SIMD_REG_DISP_WORD_SIGNED));
-    SIMDUWord->setData(QVariant(SIMD_REG_DISP_WORD_UNSIGNED));
-    SIMDHWord->setData(QVariant(SIMD_REG_DISP_WORD_HEX));
-    SIMDSDWord->setData(QVariant(SIMD_REG_DISP_DWORD_SIGNED));
-    SIMDUDWord->setData(QVariant(SIMD_REG_DISP_DWORD_UNSIGNED));
-    SIMDHDWord->setData(QVariant(SIMD_REG_DISP_DWORD_HEX));
-    SIMDSQWord->setData(QVariant(SIMD_REG_DISP_QWORD_SIGNED));
-    SIMDUQWord->setData(QVariant(SIMD_REG_DISP_QWORD_UNSIGNED));
-    SIMDHQWord->setData(QVariant(SIMD_REG_DISP_QWORD_HEX));
-    connect(SIMDHex, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDFloat, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDDouble, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDSWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDUWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDHWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDSDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDUDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDHDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDSQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDUQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(SIMDHQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
-    connect(mSwitchFPUDispMode, SIGNAL(triggered()), this, SLOT(onFpuMode()));
-    SIMDHex->setCheckable(true);
-    SIMDFloat->setCheckable(true);
-    SIMDDouble->setCheckable(true);
-    SIMDSWord->setCheckable(true);
-    SIMDUWord->setCheckable(true);
-    SIMDHWord->setCheckable(true);
-    SIMDSDWord->setCheckable(true);
-    SIMDUDWord->setCheckable(true);
-    SIMDHDWord->setCheckable(true);
-    SIMDSQWord->setCheckable(true);
-    SIMDUQWord->setCheckable(true);
-    SIMDHQWord->setCheckable(true);
-    SIMDHex->setChecked(true);
-    SIMDFloat->setChecked(false);
-    SIMDDouble->setChecked(false);
-    SIMDSWord->setChecked(false);
-    SIMDUWord->setChecked(false);
-    SIMDHWord->setChecked(false);
-    SIMDSDWord->setChecked(false);
-    SIMDUDWord->setChecked(false);
-    SIMDHDWord->setChecked(false);
-    SIMDSQWord->setChecked(false);
-    SIMDUQWord->setChecked(false);
-    SIMDHQWord->setChecked(false);
-    mSwitchSIMDDispMode->addAction(SIMDHex);
-    mSwitchSIMDDispMode->addAction(SIMDFloat);
-    mSwitchSIMDDispMode->addAction(SIMDDouble);
-    mSwitchSIMDDispMode->addAction(SIMDSWord);
-    mSwitchSIMDDispMode->addAction(SIMDSDWord);
-    mSwitchSIMDDispMode->addAction(SIMDSQWord);
-    mSwitchSIMDDispMode->addAction(SIMDUWord);
-    mSwitchSIMDDispMode->addAction(SIMDUDWord);
-    mSwitchSIMDDispMode->addAction(SIMDUQWord);
-    mSwitchSIMDDispMode->addAction(SIMDHWord);
-    mSwitchSIMDDispMode->addAction(SIMDHDWord);
-    mSwitchSIMDDispMode->addAction(SIMDHQWord);
+    mFpuMode = 0;
+    isActive = false;
 
     // general purposes register (we allow the user to modify the value)
     mGPR.insert(CAX);
@@ -1284,6 +1144,8 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
 
     fontsUpdatedSlot();
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
+    // self communication for repainting (maybe some other widgets needs this information, too)
+    connect(this, SIGNAL(refresh()), this, SLOT(reload()));
 
     InitMappings();
 
@@ -1296,62 +1158,10 @@ RegistersView::RegistersView(CPUWidget* parent) : QScrollArea(parent), mVScrollO
     yTopSpacing = 4; //set top spacing (in pixels)
 
     this->setMouseTracking(true);
-
-    // Context Menu
-    this->setContextMenuPolicy(Qt::CustomContextMenu);
-    // foreign messages
-    connect(Bridge::getBridge(), SIGNAL(updateRegisters()), this, SLOT(updateRegistersSlot()));
-    connect(this, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(displayCustomContextMenuSlot(QPoint)));
-    connect(Bridge::getBridge(), SIGNAL(dbgStateChanged(DBGSTATE)), this, SLOT(debugStateChangedSlot(DBGSTATE)));
-    connect(parent->getDisasmWidget(), SIGNAL(selectionChanged(dsint)), this, SLOT(disasmSelectionChangedSlot(dsint)));
-    // self communication for repainting (maybe some other widgets needs this information, too)
-    connect(this, SIGNAL(refresh()), this, SLOT(reload()));
-    // context menu actions
-    connect(wCM_Increment, SIGNAL(triggered()), this, SLOT(onIncrementAction()));
-    connect(wCM_ChangeFPUView, SIGNAL(triggered()), this, SLOT(onChangeFPUViewAction()));
-    connect(wCM_Decrement, SIGNAL(triggered()), this, SLOT(onDecrementAction()));
-    connect(wCM_Incrementx87Stack, SIGNAL(triggered()), this, SLOT(onIncrementx87StackAction()));
-    connect(wCM_Decrementx87Stack, SIGNAL(triggered()), this, SLOT(onDecrementx87StackAction()));
-    connect(wCM_Zero, SIGNAL(triggered()), this, SLOT(onZeroAction()));
-    connect(wCM_SetToOne, SIGNAL(triggered()), this, SLOT(onSetToOneAction()));
-    connect(wCM_Modify, SIGNAL(triggered()), this, SLOT(onModifyAction()));
-    connect(wCM_ToggleValue, SIGNAL(triggered()), this, SLOT(onToggleValueAction()));
-    connect(wCM_Undo, SIGNAL(triggered()), this, SLOT(onUndoAction()));
-    connect(wCM_CopyToClipboard, SIGNAL(triggered()), this, SLOT(onCopyToClipboardAction()));
-    connect(wCM_CopyFloatingPointValueToClipboard, SIGNAL(triggered()), this, SLOT(onCopyFloatingPointToClipboardAction()));
-    connect(wCM_CopySymbolToClipboard, SIGNAL(triggered()), this, SLOT(onCopySymbolToClipboardAction()));
-    connect(wCM_CopyAll, SIGNAL(triggered()), this, SLOT(onCopyAllAction()));
-    connect(wCM_FollowInDisassembly, SIGNAL(triggered()), this, SLOT(onFollowInDisassembly()));
-    connect(wCM_FollowInDump, SIGNAL(triggered()), this, SLOT(onFollowInDump()));
-    connect(wCM_FollowInStack, SIGNAL(triggered()), this, SLOT(onFollowInStack()));
-    connect(wCM_FollowInMemoryMap, SIGNAL(triggered()), this, SLOT(onFollowInMemoryMap()));
-    connect(wCM_IncrementPtrSize, SIGNAL(triggered()), this, SLOT(onIncrementPtrSize()));
-    connect(wCM_DecrementPtrSize, SIGNAL(triggered()), this, SLOT(onDecrementPtrSize()));
-    connect(wCM_Push, SIGNAL(triggered()), this, SLOT(onPushAction()));
-    connect(wCM_Pop, SIGNAL(triggered()), this, SLOT(onPopAction()));
-    connect(wCM_Highlight, SIGNAL(triggered()), this, SLOT(onHighlightSlot()));
-
-    refreshShortcutsSlot();
-    connect(Config(), SIGNAL(shortcutsUpdated()), this, SLOT(refreshShortcutsSlot()));
 }
 
 void RegistersView::refreshShortcutsSlot()
 {
-    wCM_Increment->setShortcut(ConfigShortcut("ActionIncreaseRegister"));
-    wCM_Decrement->setShortcut(ConfigShortcut("ActionDecreaseRegister"));
-    wCM_Zero->setShortcut(ConfigShortcut("ActionZeroRegister"));
-    wCM_SetToOne->setShortcut(ConfigShortcut("ActionSetOneRegister"));
-    wCM_ToggleValue->setShortcut(ConfigShortcut("ActionToggleRegisterValue"));
-    wCM_CopyToClipboard->setShortcut(ConfigShortcut("ActionCopy"));
-    wCM_CopySymbolToClipboard->setShortcut(ConfigShortcut("ActionCopySymbol"));
-    wCM_CopyAll->setShortcut(ConfigShortcut("ActionCopyAllRegisters"));
-    wCM_Highlight->setShortcut(ConfigShortcut("ActionHighlightingMode"));
-    wCM_IncrementPtrSize->setShortcut(ConfigShortcut("ActionIncreaseRegisterPtrSize"));
-    wCM_DecrementPtrSize->setShortcut(ConfigShortcut("ActionDecreaseRegisterPtrSize"));
-    wCM_Incrementx87Stack->setShortcut(ConfigShortcut("ActionIncrementx87Stack"));
-    wCM_Decrementx87Stack->setShortcut(ConfigShortcut("ActionDecrementx87Stack"));
-    wCM_Push->setShortcut(ConfigShortcut("ActionPush"));
-    wCM_Pop->setShortcut(ConfigShortcut("ActionPop"));
 }
 
 /**
@@ -1359,51 +1169,6 @@ void RegistersView::refreshShortcutsSlot()
  */
 RegistersView::~RegistersView()
 {
-}
-
-void RegistersView::onClose()
-{
-    duint cfg = 0;
-    switch(wSIMDRegDispMode)
-    {
-    case SIMD_REG_DISP_HEX:
-        cfg = 0;
-        break;
-    case SIMD_REG_DISP_FLOAT:
-        cfg = 1;
-        break;
-    case SIMD_REG_DISP_DOUBLE:
-        cfg = 2;
-        break;
-    case SIMD_REG_DISP_WORD_SIGNED:
-        cfg = 3;
-        break;
-    case SIMD_REG_DISP_DWORD_SIGNED:
-        cfg = 4;
-        break;
-    case SIMD_REG_DISP_QWORD_SIGNED:
-        cfg = 5;
-        break;
-    case SIMD_REG_DISP_WORD_UNSIGNED:
-        cfg = 6;
-        break;
-    case SIMD_REG_DISP_DWORD_UNSIGNED:
-        cfg = 7;
-        break;
-    case SIMD_REG_DISP_QWORD_UNSIGNED:
-        cfg = 8;
-        break;
-    case SIMD_REG_DISP_WORD_HEX:
-        cfg = 9;
-        break;
-    case SIMD_REG_DISP_DWORD_HEX:
-        cfg = 10;
-        break;
-    case SIMD_REG_DISP_QWORD_HEX:
-        cfg = 11;
-        break;
-    }
-    Config()->setUint("Gui", "SIMDRegistersDisplayMode", cfg);
 }
 
 void RegistersView::fontsUpdatedSlot()
@@ -1426,10 +1191,16 @@ void RegistersView::fontsUpdatedSlot()
     reload();
 }
 
+void RegistersView::displayCustomContextMenuSlot(QPoint pos)
+{
+
+}
+
 void RegistersView::ShowFPU(bool set_showfpu)
 {
     mShowFpu = set_showfpu;
     InitMappings();
+    setFixedHeight(getEstimateHeight());
     reload();
 }
 
@@ -1626,25 +1397,9 @@ QString RegistersView::helpRegister(REGISTER_NAME reg)
     }
 }
 
-void RegistersView::CreateDumpNMenu(QMenu* dumpMenu)
-{
-    QList<QString> names;
-    CPUMultiDump* multiDump = mParent->getDumpWidget();
-    dumpMenu->setIcon(DIcon("dump.png"));
-    int maxDumps = multiDump->getMaxCPUTabs();
-    multiDump->getTabNames(names);
-    for(int i = 0; i < maxDumps; i++)
-    {
-        QAction* action = new QAction(names.at(i), this);
-        connect(action, SIGNAL(triggered()), this, SLOT(onFollowInDumpN()));
-        dumpMenu->addAction(action);
-        action->setData(i + 1);
-    }
-}
-
 void RegistersView::mousePressEvent(QMouseEvent* event)
 {
-    if(!DbgIsDebugging())
+    if(!isActive)
         return;
 
     if(event->y() < yTopSpacing - mButtonHeight)
@@ -1661,24 +1416,7 @@ void RegistersView::mousePressEvent(QMouseEvent* event)
         // do we find a corresponding register?
         if(identifyRegister(y, x, &r))
         {
-            Disassembly* CPUDisassemblyView = mParent->getDisasmWidget();
-            if(CPUDisassemblyView->isHighlightMode())
-            {
-                if(mGPR.contains(r) && r != REGISTER_NAME::EFLAGS)
-                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(r).value()));
-                else if(mFPUMMX.contains(r))
-                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(r).value()));
-                else if(mFPUXMM.contains(r))
-                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(r).value()));
-                else if(mFPUYMM.contains(r))
-                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(r).value()));
-                else if(mSEGMENTREGISTER.contains(r))
-                    CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(r).value()));
-                else
-                    mSelected = r;
-            }
-            else
-                mSelected = r;
+            mSelected = r;
             emit refresh();
         }
         else
@@ -1688,7 +1426,7 @@ void RegistersView::mousePressEvent(QMouseEvent* event)
 
 void RegistersView::mouseMoveEvent(QMouseEvent* event)
 {
-    if(!DbgIsDebugging())
+    if(!isActive)
     {
         QScrollArea::mouseMoveEvent(event);
         setCursor(QCursor(Qt::ArrowCursor));
@@ -1717,24 +1455,6 @@ void RegistersView::mouseMoveEvent(QMouseEvent* event)
 
 void RegistersView::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    if(!DbgIsDebugging() || event->button() != Qt::LeftButton)
-        return;
-    // get mouse position
-    const int y = (event->y() - yTopSpacing) / (double)mRowHeight;
-    const int x = event->x() / (double)mCharWidth;
-
-    // do we find a corresponding register?
-    if(!identifyRegister(y, x, 0))
-        return;
-    if(mSelected == CIP) //double clicked on CIP register
-        DbgCmdExec("disasm cip");
-    // is current register general purposes register or FPU register?
-    else if(mMODIFYDISPLAY.contains(mSelected))
-        wCM_Modify->trigger();
-    else if(mBOOLDISPLAY.contains(mSelected)) // is flag ?
-        wCM_ToggleValue->trigger();
-    else if(mCANSTOREADDRESS.contains(mSelected))
-        wCM_FollowInDisassembly->trigger();
 }
 
 void RegistersView::paintEvent(QPaintEvent* event)
@@ -1750,10 +1470,11 @@ void RegistersView::paintEvent(QPaintEvent* event)
     }
 
     QPainter wPainter(this->viewport());
+    wPainter.setFont(font());
     wPainter.fillRect(wPainter.viewport(), QBrush(ConfigColor("RegistersBackgroundColor")));
 
     // Don't draw the registers if a program isn't actually running
-    if(!DbgIsDebugging())
+    if(!isActive)
         return;
 
     // Iterate all registers
@@ -1766,38 +1487,6 @@ void RegistersView::paintEvent(QPaintEvent* event)
 
 void RegistersView::keyPressEvent(QKeyEvent* event)
 {
-    if(DbgIsDebugging())
-    {
-        int key = event->key();
-        REGISTER_NAME newRegister = UNKNOWN;
-
-        switch(key)
-        {
-        case Qt::Key_Enter:
-        case Qt::Key_Return:
-            wCM_Modify->trigger();
-            break;
-        case Qt::Key_Left:
-            newRegister = mRegisterRelativePlaces[mSelected].left;
-            break;
-        case Qt::Key_Right:
-            newRegister = mRegisterRelativePlaces[mSelected].right;
-            break;
-        case Qt::Key_Up:
-            newRegister = mRegisterRelativePlaces[mSelected].up;
-            break;
-        case Qt::Key_Down:
-            newRegister = mRegisterRelativePlaces[mSelected].down;
-            break;
-        }
-
-        if(newRegister != UNKNOWN)
-        {
-            mSelected = newRegister;
-            ensureRegisterVisible(newRegister);
-            emit refresh();
-        }
-    }
     QScrollArea::keyPressEvent(event);
 }
 
@@ -1873,133 +1562,6 @@ QString RegistersView::getRegisterLabel(REGISTER_NAME register_selected)
     }
 
     return std::move(newText);
-}
-
-static QString fillValue(const char* value, int valsize = 2, bool bFpuRegistersLittleEndian = false)
-{
-    if(bFpuRegistersLittleEndian)
-        return QString(QByteArray(value, valsize).toHex()).toUpper();
-    else // Big Endian
-        return QString(ByteReverse(QByteArray(value, valsize)).toHex()).toUpper();
-}
-
-static QString composeRegTextXMM(const char* value, RegistersView::SIMD_REG_DISP_MODE wSIMDRegDispMode, bool bFpuRegistersLittleEndian)
-{
-    QString valueText;
-    switch(wSIMDRegDispMode)
-    {
-    default:
-    case RegistersView::SIMD_REG_DISP_HEX:
-    {
-        valueText = fillValue(value, 16, bFpuRegistersLittleEndian);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_DOUBLE:
-    {
-        const double* dbl_values = reinterpret_cast<const double*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = ToDoubleString(&dbl_values[0]) + ' ' + ToDoubleString(&dbl_values[1]);
-        else // Big Endian
-            valueText = ToDoubleString(&dbl_values[1]) + ' ' + ToDoubleString(&dbl_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_FLOAT:
-    {
-        const float* flt_values = reinterpret_cast<const float*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = ToFloatString(&flt_values[0]) + ' ' + ToFloatString(&flt_values[1]) + ' '
-                        + ToFloatString(&flt_values[2]) + ' ' + ToFloatString(&flt_values[3]);
-        else // Big Endian
-            valueText = ToFloatString(&flt_values[3]) + ' ' + ToFloatString(&flt_values[2]) + ' '
-                        + ToFloatString(&flt_values[1]) + ' ' + ToFloatString(&flt_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_WORD_HEX:
-    {
-        if(bFpuRegistersLittleEndian)
-            valueText = fillValue(value) + ' ' + fillValue(value + 1 * 2) + ' ' + fillValue(value + 2 * 2) + ' ' + fillValue(value + 3 * 2)
-                        + ' ' + fillValue(value + 4 * 2) + ' ' + fillValue(value + 5 * 2) + ' ' + fillValue(value + 6 * 2) + ' ' + fillValue(value + 7 * 2);
-        else // Big Endian
-            valueText = fillValue(value + 7 * 2) + ' ' + fillValue(value + 6 * 2) + ' ' + fillValue(value + 5 * 2) + ' ' + fillValue(value + 4 * 2)
-                        + ' ' + fillValue(value + 3 * 2) + ' ' + fillValue(value + 2 * 2) + ' ' + fillValue(value + 1 * 2) + ' ' + fillValue(value);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_WORD_SIGNED:
-    {
-        const short* sword_values = reinterpret_cast<const short*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(sword_values[0]) + ' ' + QString::number(sword_values[1]) + ' ' + QString::number(sword_values[2]) + ' ' + QString::number(sword_values[3])
-                        + ' ' + QString::number(sword_values[4]) + ' ' + QString::number(sword_values[5]) + ' ' + QString::number(sword_values[6]) + ' ' + QString::number(sword_values[7]);
-        else // Big Endian
-            valueText = QString::number(sword_values[7]) + ' ' + QString::number(sword_values[6]) + ' ' + QString::number(sword_values[5]) + ' ' + QString::number(sword_values[4])
-                        + ' ' + QString::number(sword_values[3]) + ' ' + QString::number(sword_values[2]) + ' ' + QString::number(sword_values[1]) + ' ' + QString::number(sword_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_WORD_UNSIGNED:
-    {
-        const unsigned short* uword_values = reinterpret_cast<const unsigned short*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(uword_values[0]) + ' ' + QString::number(uword_values[1]) + ' ' + QString::number(uword_values[2]) + ' ' + QString::number(uword_values[3])
-                        + ' ' + QString::number(uword_values[4]) + ' ' + QString::number(uword_values[5]) + ' ' + QString::number(uword_values[6]) + ' ' + QString::number(uword_values[7]);
-        else // Big Endian
-            valueText = QString::number(uword_values[7]) + ' ' + QString::number(uword_values[6]) + ' ' + QString::number(uword_values[5]) + ' ' + QString::number(uword_values[4])
-                        + ' ' + QString::number(uword_values[3]) + ' ' + QString::number(uword_values[2]) + ' ' + QString::number(uword_values[1]) + ' ' + QString::number(uword_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_DWORD_HEX:
-    {
-        if(bFpuRegistersLittleEndian)
-            valueText = fillValue(value, 4) + ' ' +  fillValue(value + 1 * 4, 4) + ' ' +  fillValue(value + 2 * 4, 4) + ' ' +  fillValue(value + 3 * 4, 4);
-        else // Big Endian
-            valueText = fillValue(value + 3 * 4, 4) + ' ' +  fillValue(value + 2 * 4, 4) + ' ' +  fillValue(value + 1 * 4, 4) + ' ' +  fillValue(value, 4);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_DWORD_SIGNED:
-    {
-        const int* sdword_values = reinterpret_cast<const int*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(sdword_values[0]) + ' ' + QString::number(sdword_values[1]) + ' ' + QString::number(sdword_values[2]) + ' ' + QString::number(sdword_values[3]);
-        else // Big Endian
-            valueText = QString::number(sdword_values[3]) + ' ' + QString::number(sdword_values[2]) + ' ' + QString::number(sdword_values[1]) + ' ' + QString::number(sdword_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_DWORD_UNSIGNED:
-    {
-        const unsigned int* udword_values = reinterpret_cast<const unsigned int*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(udword_values[0]) + ' ' + QString::number(udword_values[1]) + ' ' + QString::number(udword_values[2]) + ' ' + QString::number(udword_values[3]);
-        else // Big Endian
-            valueText = QString::number(udword_values[3]) + ' ' + QString::number(udword_values[2]) + ' ' + QString::number(udword_values[1]) + ' ' + QString::number(udword_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_QWORD_HEX:
-    {
-        if(bFpuRegistersLittleEndian)
-            valueText = fillValue(value, 8) + ' ' + fillValue(value + 8, 8);
-        else // Big Endian
-            valueText = fillValue(value + 8, 8) + ' ' + fillValue(value, 8);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_QWORD_SIGNED:
-    {
-        const long long* sqword_values = reinterpret_cast<const long long*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(sqword_values[0]) + ' ' + QString::number(sqword_values[1]);
-        else // Big Endian
-            valueText = QString::number(sqword_values[1]) + ' ' + QString::number(sqword_values[0]);
-    }
-    break;
-    case RegistersView::SIMD_REG_DISP_QWORD_UNSIGNED:
-    {
-        const unsigned long long* uqword_values = reinterpret_cast<const unsigned long long*>(value);
-        if(bFpuRegistersLittleEndian)
-            valueText = QString::number(uqword_values[0]) + ' ' + QString::number(uqword_values[1]);
-        else // Big Endian
-            valueText = QString::number(uqword_values[1]) + ' ' + QString::number(uqword_values[0]);
-    }
-    break;
-    }
-    return std::move(valueText);
 }
 
 /**
@@ -2085,16 +1647,9 @@ QString RegistersView::GetRegStringValueFromValue(REGISTER_NAME reg, const char*
         if(size != 0)
         {
             if(mFPUXMM.contains(reg))
-                valueText = composeRegTextXMM(value, wSIMDRegDispMode, bFpuRegistersLittleEndian);
+                valueText = GetDataTypeString(value, size, enc_xmmword);
             else if(mFPUYMM.contains(reg))
-            {
-                if(wSIMDRegDispMode == SIMD_REG_DISP_HEX)
-                    valueText = fillValue(value, size, bFpuRegistersLittleEndian);
-                else if(bFpuRegistersLittleEndian)
-                    valueText = composeRegTextXMM(value, wSIMDRegDispMode, bFpuRegistersLittleEndian) + ' ' + composeRegTextXMM(value + 16, wSIMDRegDispMode, bFpuRegistersLittleEndian);
-                else
-                    valueText = composeRegTextXMM(value + 16, wSIMDRegDispMode, bFpuRegistersLittleEndian) + ' ' + composeRegTextXMM(value, wSIMDRegDispMode, bFpuRegistersLittleEndian);
-            }
+                valueText = GetDataTypeString(value, size, enc_ymmword);
             else
                 valueText = fillValue(value, size, bFpuRegistersLittleEndian);
         }
@@ -2405,7 +1960,7 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
         //p->drawText(offset,mRowHeight*(mRegisterPlaces[reg].line+1),mRegisterMapping[reg]);
 
         //set highlighting
-        if(DbgIsDebugging() && mRegisterUpdates.contains(reg))
+        if(isActive && mRegisterUpdates.contains(reg))
             p->setPen(ConfigColor("RegistersModifiedColor"));
         else
             p->setPen(ConfigColor("RegistersColor"));
@@ -2427,7 +1982,7 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
 
         x += width;
 
-        if(mFPUx87_80BITSDISPLAY.contains(reg) && DbgIsDebugging())
+        if(mFPUx87_80BITSDISPLAY.contains(reg) && isActive)
         {
             p->setPen(ConfigColor("RegistersExtraInfoColor"));
             x += 1 * mCharWidth; //1 space
@@ -2466,7 +2021,7 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
 
             p->setPen(ConfigColor("RegistersExtraInfoColor"));
 
-            if(DbgIsDebugging() && mRegisterUpdates.contains(reg))
+            if(isActive && mRegisterUpdates.contains(reg))
                 p->setPen(ConfigColor("RegistersModifiedColor"));
 
             newText += ToLongDoubleString(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, reg))->data);
@@ -2493,392 +2048,6 @@ void RegistersView::drawRegister(QPainter* p, REGISTER_NAME reg, char* value)
     }
 }
 
-void RegistersView::updateRegistersSlot()
-{
-    // read registers
-    REGDUMP z;
-    DbgGetRegDumpEx(&z, sizeof(REGDUMP));
-    // update gui
-    setRegisters(&z);
-}
-
-void RegistersView::ModifyFields(const QString & title, STRING_VALUE_TABLE_t* table, SIZE_T size)
-{
-    SelectFields mSelectFields(this);
-    QListWidget* mQListWidget = mSelectFields.GetList();
-
-    QStringList items;
-    unsigned int i;
-
-    for(i = 0; i < size; i++)
-        items << QApplication::translate("RegistersView_ConstantsOfRegisters", table[i].string) + QString(" (%1)").arg(table[i].value, 0, 16);
-
-    mQListWidget->addItems(items);
-
-    mSelectFields.setWindowTitle(title);
-    if(mSelectFields.exec() != QDialog::Accepted)
-        return;
-
-    if(mQListWidget->selectedItems().count() != 1)
-        return;
-
-    //QListWidgetItem* item = mQListWidget->takeItem(mQListWidget->currentRow());
-    QString itemText = mQListWidget->item(mQListWidget->currentRow())->text();
-
-    duint value;
-
-    for(i = 0; i < size; i++)
-    {
-        if(QApplication::translate("RegistersView_ConstantsOfRegisters", table[i].string) + QString(" (%1)").arg(table[i].value, 0, 16) == itemText)
-            break;
-    }
-
-    value = table[i].value;
-
-    setRegister(mSelected, (duint)value);
-    //delete item;
-}
-
-#define MODIFY_FIELDS_DISPLAY(prefix, title, table) ModifyFields(prefix + QChar(' ') + QString(title), (STRING_VALUE_TABLE_t *) & table, SIZE_TABLE(table) )
-
-/**
- * @brief   This function displays the appropriate edit dialog according to selected register
- * @return  Nothing.
- */
-
-void RegistersView::displayEditDialog()
-{
-    if(mFPU.contains(mSelected))
-    {
-        if(mTAGWORD.contains(mSelected))
-            MODIFY_FIELDS_DISPLAY(tr("Edit"), "Tag " + mRegisterMapping.constFind(mSelected).value(), TagWordValueStringTable);
-        else if(mSelected == MxCsr_RC)
-            MODIFY_FIELDS_DISPLAY(tr("Edit"), "MxCsr_RC", MxCsrRCValueStringTable);
-        else if(mSelected == x87CW_RC)
-            MODIFY_FIELDS_DISPLAY(tr("Edit"), "x87CW_RC", ControlWordRCValueStringTable);
-        else if(mSelected == x87CW_PC)
-            MODIFY_FIELDS_DISPLAY(tr("Edit"), "x87CW_PC", ControlWordPCValueStringTable);
-        else if(mSelected == x87SW_TOP)
-        {
-            MODIFY_FIELDS_DISPLAY(tr("Edit"), "x87SW_TOP", StatusWordTOPValueStringTable);
-            // if(mFpuMode == false)
-            updateRegistersSlot();
-        }
-        else if(mFPUYMM.contains(mSelected))
-        {
-            EditFloatRegister mEditFloat(256, this);
-            mEditFloat.setWindowTitle(tr("Edit YMM register"));
-            mEditFloat.loadData(registerValue(&wRegDumpStruct, mSelected));
-            mEditFloat.show();
-            mEditFloat.selectAllText();
-            if(mEditFloat.exec() == QDialog::Accepted)
-                setRegister(mSelected, (duint)mEditFloat.getData());
-        }
-        else if(mFPUXMM.contains(mSelected))
-        {
-            EditFloatRegister mEditFloat(128, this);
-            mEditFloat.setWindowTitle(tr("Edit XMM register"));
-            mEditFloat.loadData(registerValue(&wRegDumpStruct, mSelected));
-            mEditFloat.show();
-            mEditFloat.selectAllText();
-            if(mEditFloat.exec() == QDialog::Accepted)
-                setRegister(mSelected, (duint)mEditFloat.getData());
-        }
-        else if(mFPUMMX.contains(mSelected))
-        {
-            EditFloatRegister mEditFloat(64, this);
-            mEditFloat.setWindowTitle(tr("Edit MMX register"));
-            mEditFloat.loadData(registerValue(&wRegDumpStruct, mSelected));
-            mEditFloat.show();
-            mEditFloat.selectAllText();
-            if(mEditFloat.exec() == QDialog::Accepted)
-                setRegister(mSelected, (duint)mEditFloat.getData());
-        }
-        else
-        {
-            bool errorinput = false;
-            LineEditDialog mLineEdit(this);
-
-            mLineEdit.setText(GetRegStringValueFromValue(mSelected,  registerValue(&wRegDumpStruct, mSelected)));
-            mLineEdit.setWindowTitle(tr("Edit FPU register"));
-            mLineEdit.setWindowIcon(DIcon("log.png"));
-            mLineEdit.setCursorPosition(0);
-            auto sizeRegister = int(GetSizeRegister(mSelected));
-            if(sizeRegister == 10)
-                mLineEdit.setFpuMode();
-            mLineEdit.ForceSize(sizeRegister * 2);
-            do
-            {
-                errorinput = false;
-                mLineEdit.show();
-                mLineEdit.selectAllText();
-                if(mLineEdit.exec() != QDialog::Accepted)
-                    return; //pressed cancel
-                else
-                {
-                    bool ok = false;
-                    duint fpuvalue;
-
-                    if(mUSHORTDISPLAY.contains(mSelected))
-                        fpuvalue = (duint) mLineEdit.editText.toUShort(&ok, 16);
-                    else if(mDWORDDISPLAY.contains(mSelected))
-                        fpuvalue = mLineEdit.editText.toUInt(&ok, 16);
-                    else if(mFPUx87_80BITSDISPLAY.contains(mSelected))
-                    {
-                        QString editTextLower = mLineEdit.editText.toLower();
-                        if(sizeRegister == 10 && (mLineEdit.editText.contains(QChar('.')) || editTextLower == "nan" || editTextLower == "inf"
-                                                  || editTextLower == "+inf" || editTextLower == "-inf"))
-                        {
-                            char number[10];
-                            str2ld(mLineEdit.editText.toUtf8().constData(), number);
-                            setRegister(mSelected, reinterpret_cast<duint>(number));
-                            return;
-                        }
-                        else
-                        {
-                            QByteArray pArray =  mLineEdit.editText.toLocal8Bit();
-
-                            if(pArray.size() == sizeRegister * 2)
-                            {
-                                char* pData = (char*) calloc(1, sizeof(char) * sizeRegister);
-
-                                if(pData != NULL)
-                                {
-                                    ok = true;
-                                    char actual_char[3];
-                                    for(int i = 0; i < sizeRegister; i++)
-                                    {
-                                        memset(actual_char, 0, sizeof(actual_char));
-                                        memcpy(actual_char, (char*) pArray.data() + (i * 2), 2);
-                                        if(! isxdigit(actual_char[0]) || ! isxdigit(actual_char[1]))
-                                        {
-                                            ok = false;
-                                            break;
-                                        }
-                                        pData[i] = (char)strtol(actual_char, NULL, 16);
-                                    }
-
-                                    if(ok)
-                                    {
-                                        if(!ConfigBool("Gui", "FpuRegistersLittleEndian")) // reverse byte order if it is big-endian
-                                        {
-                                            pArray = ByteReverse(QByteArray(pData, sizeRegister));
-                                            setRegister(mSelected, reinterpret_cast<duint>(pArray.constData()));
-                                        }
-                                        else
-                                            setRegister(mSelected, reinterpret_cast<duint>(pData));
-                                    }
-
-                                    free(pData);
-
-                                    if(ok)
-                                        return;
-                                }
-                            }
-                        }
-                    }
-                    if(!ok)
-                    {
-                        errorinput = true;
-
-                        SimpleWarningBox(this, tr("ERROR CONVERTING TO HEX"), tr("ERROR CONVERTING TO HEX"));
-                    }
-                    else
-                        setRegister(mSelected, fpuvalue);
-                }
-            }
-            while(errorinput);
-        }
-    }
-    else if(mSelected == LastError)
-    {
-        bool errorinput = false;
-        LineEditDialog mLineEdit(this);
-        LASTERROR* error = (LASTERROR*)registerValue(&wRegDumpStruct, LastError);
-        mLineEdit.setText(QString::number(error->code, 16));
-        mLineEdit.setWindowTitle(tr("Set Last Error"));
-        mLineEdit.setCursorPosition(0);
-        do
-        {
-            errorinput = true;
-            mLineEdit.show();
-            mLineEdit.selectAllText();
-            if(mLineEdit.exec() != QDialog::Accepted)
-                return;
-            if(DbgIsValidExpression(mLineEdit.editText.toUtf8().constData()))
-                errorinput = false;
-        }
-        while(errorinput);
-        setRegister(LastError, DbgValFromString(mLineEdit.editText.toUtf8().constData()));
-    }
-    else if(mSelected == LastStatus)
-    {
-        bool statusinput = false;
-        LineEditDialog mLineEdit(this);
-        LASTSTATUS* status = (LASTSTATUS*)registerValue(&wRegDumpStruct, LastStatus);
-        mLineEdit.setText(QString::number(status->code, 16));
-        mLineEdit.setWindowTitle(tr("Set Last Status"));
-        mLineEdit.setCursorPosition(0);
-        do
-        {
-            statusinput = true;
-            mLineEdit.show();
-            mLineEdit.selectAllText();
-            if(mLineEdit.exec() != QDialog::Accepted)
-                return;
-            if(DbgIsValidExpression(mLineEdit.editText.toUtf8().constData()))
-                statusinput = false;
-        }
-        while(statusinput);
-        setRegister(LastStatus, DbgValFromString(mLineEdit.editText.toUtf8().constData()));
-    }
-    else
-    {
-        WordEditDialog wEditDial(this);
-        wEditDial.setup(tr("Edit"), (* ((duint*) registerValue(&wRegDumpStruct, mSelected))), sizeof(dsint));
-        if(wEditDial.exec() == QDialog::Accepted) //OK button clicked
-            setRegister(mSelected, wEditDial.getVal());
-    }
-}
-
-void RegistersView::onIncrementx87StackAction()
-{
-    if(mFPUx87_80BITSDISPLAY.contains(mSelected))
-        setRegister(x87SW_TOP, ((* ((duint*) registerValue(&wRegDumpStruct, x87SW_TOP))) + 1) % 8);
-}
-
-void RegistersView::onDecrementx87StackAction()
-{
-    if(mFPUx87_80BITSDISPLAY.contains(mSelected))
-        setRegister(x87SW_TOP, ((* ((duint*) registerValue(&wRegDumpStruct, x87SW_TOP))) - 1) % 8);
-}
-
-void RegistersView::onIncrementAction()
-{
-    if(mINCREMENTDECREMET.contains(mSelected))
-        setRegister(mSelected, (* ((duint*) registerValue(&wRegDumpStruct, mSelected))) + 1);
-}
-
-void RegistersView::onDecrementAction()
-{
-    if(mINCREMENTDECREMET.contains(mSelected))
-        setRegister(mSelected, (* ((duint*) registerValue(&wRegDumpStruct, mSelected))) - 1);
-}
-
-void RegistersView::onIncrementPtrSize()
-{
-    if(mINCREMENTDECREMET.contains(mSelected))
-        setRegister(mSelected, (* ((duint*) registerValue(&wRegDumpStruct, mSelected))) + sizeof(void*));
-}
-
-void RegistersView::onDecrementPtrSize()
-{
-    if(mINCREMENTDECREMET.contains(mSelected))
-        setRegister(mSelected, (* ((duint*) registerValue(&wRegDumpStruct, mSelected))) - sizeof(void*));
-}
-
-void RegistersView::onPushAction()
-{
-    duint csp = (* ((duint*) registerValue(&wRegDumpStruct, CSP))) - sizeof(void*);
-    duint regVal = 0;
-    regVal = * ((duint*) registerValue(&wRegDumpStruct, mSelected));
-    setRegister(CSP, csp);
-    DbgMemWrite(csp, (const unsigned char*)&regVal, sizeof(void*));
-}
-
-void RegistersView::onPopAction()
-{
-    duint csp = (* ((duint*) registerValue(&wRegDumpStruct, CSP)));
-    duint newVal;
-    DbgMemRead(csp, (unsigned char*)&newVal, sizeof(void*));
-    setRegister(CSP, csp + sizeof(void*));
-    setRegister(mSelected, newVal);
-}
-
-void RegistersView::onZeroAction()
-{
-    if(mSETONEZEROTOGGLE.contains(mSelected))
-    {
-        if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
-            setRegister(mSelected, reinterpret_cast<duint>("\0\0\0\0\0\0\0\0\0")); //9 zeros and 1 terminating zero
-        else
-            setRegister(mSelected, 0);
-    }
-}
-
-void RegistersView::onSetToOneAction()
-{
-    if(mSETONEZEROTOGGLE.contains(mSelected))
-    {
-        if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
-            setRegister(mSelected, reinterpret_cast<duint>("\0\0\0\0\0\0\0\x80\xFF\x3F"));
-        else
-            setRegister(mSelected, 1);
-    }
-}
-
-void RegistersView::onModifyAction()
-{
-    if(mMODIFYDISPLAY.contains(mSelected))
-        displayEditDialog();
-}
-
-void RegistersView::onToggleValueAction()
-{
-    if(mBOOLDISPLAY.contains(mSelected))
-    {
-        int value = (int)(* (bool*) registerValue(&wRegDumpStruct, mSelected));
-        setRegister(mSelected, value ^ 1);
-    }
-}
-
-void RegistersView::onUndoAction()
-{
-    if(mUNDODISPLAY.contains(mSelected))
-    {
-        if(mFPUMMX.contains(mSelected) || mFPUXMM.contains(mSelected) || mFPUYMM.contains(mSelected) || mFPUx87_80BITSDISPLAY.contains(mSelected))
-            setRegister(mSelected, (duint)registerValue(&wCipRegDumpStruct, mSelected));
-        else
-            setRegister(mSelected, *(duint*)registerValue(&wCipRegDumpStruct, mSelected));
-    }
-}
-
-void RegistersView::onCopyToClipboardAction()
-{
-    Bridge::CopyToClipboard(GetRegStringValueFromValue(mSelected, registerValue(&wRegDumpStruct, mSelected)));
-}
-
-void RegistersView::onCopyFloatingPointToClipboardAction()
-{
-    Bridge::CopyToClipboard(ToLongDoubleString(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, mSelected))->data));
-}
-
-void RegistersView::onCopySymbolToClipboardAction()
-{
-    if(mLABELDISPLAY.contains(mSelected))
-    {
-        QString symbol = getRegisterLabel(mSelected);
-        if(symbol != "")
-            Bridge::CopyToClipboard(symbol);
-    }
-}
-
-void RegistersView::onHighlightSlot()
-{
-    Disassembly* CPUDisassemblyView = mParent->getDisasmWidget();
-    if(mGPR.contains(mSelected) && mSelected != REGISTER_NAME::EFLAGS)
-        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::GeneralRegister, mRegisterMapping.constFind(mSelected).value()));
-    else if(mSEGMENTREGISTER.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MemorySegment, mRegisterMapping.constFind(mSelected).value()));
-    else if(mFPUMMX.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::MmxRegister, mRegisterMapping.constFind(mSelected).value()));
-    else if(mFPUXMM.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::XmmRegister, mRegisterMapping.constFind(mSelected).value()));
-    else if(mFPUYMM.contains(mSelected))
-        CPUDisassemblyView->hightlightToken(ZydisTokenizer::SingleToken(ZydisTokenizer::TokenType::YmmRegister, mRegisterMapping.constFind(mSelected).value()));
-    CPUDisassemblyView->reloadData();
-}
-
 void RegistersView::appendRegister(QString & text, REGISTER_NAME reg, const char* name64, const char* name32)
 {
     QString symbol;
@@ -2897,6 +2066,11 @@ void RegistersView::appendRegister(QString & text, REGISTER_NAME reg, const char
         text.append(symbol);
     }
     text.append("\r\n");
+}
+
+void RegistersView::onChangeFPUViewAction()
+{
+    ShowFPU(!mShowFpu);
 }
 
 void RegistersView::onCopyAllAction()
@@ -2941,15 +2115,39 @@ void RegistersView::onCopyAllAction()
     appendRegister(text, REGISTER_NAME::SS, "SS : ", "SS : ");
     if(mShowFpu)
     {
-
-        appendRegister(text, REGISTER_NAME::x87r0, "x87r0 : ", "x87r0 : ");
-        appendRegister(text, REGISTER_NAME::x87r1, "x87r1 : ", "x87r1 : ");
-        appendRegister(text, REGISTER_NAME::x87r2, "x87r2 : ", "x87r2 : ");
-        appendRegister(text, REGISTER_NAME::x87r3, "x87r3 : ", "x87r3 : ");
-        appendRegister(text, REGISTER_NAME::x87r4, "x87r4 : ", "x87r4 : ");
-        appendRegister(text, REGISTER_NAME::x87r5, "x87r5 : ", "x87r5 : ");
-        appendRegister(text, REGISTER_NAME::x87r6, "x87r6 : ", "x87r6 : ");
-        appendRegister(text, REGISTER_NAME::x87r7, "x87r7 : ", "x87r7 : ");
+        switch(mFpuMode)
+        {
+        case 0:
+            appendRegister(text, REGISTER_NAME::x87st0, "ST(0) : ", "ST(0) : ");
+            appendRegister(text, REGISTER_NAME::x87st1, "ST(1) : ", "ST(1) : ");
+            appendRegister(text, REGISTER_NAME::x87st2, "ST(2) : ", "ST(2) : ");
+            appendRegister(text, REGISTER_NAME::x87st3, "ST(3) : ", "ST(3) : ");
+            appendRegister(text, REGISTER_NAME::x87st4, "ST(4) : ", "ST(4) : ");
+            appendRegister(text, REGISTER_NAME::x87st5, "ST(5) : ", "ST(5) : ");
+            appendRegister(text, REGISTER_NAME::x87st6, "ST(6) : ", "ST(6) : ");
+            appendRegister(text, REGISTER_NAME::x87st7, "ST(7) : ", "ST(7) : ");
+            break;
+        case 1:
+            appendRegister(text, REGISTER_NAME::x87r0, "x87r0 : ", "x87r0 : ");
+            appendRegister(text, REGISTER_NAME::x87r1, "x87r1 : ", "x87r1 : ");
+            appendRegister(text, REGISTER_NAME::x87r2, "x87r2 : ", "x87r2 : ");
+            appendRegister(text, REGISTER_NAME::x87r3, "x87r3 : ", "x87r3 : ");
+            appendRegister(text, REGISTER_NAME::x87r4, "x87r4 : ", "x87r4 : ");
+            appendRegister(text, REGISTER_NAME::x87r5, "x87r5 : ", "x87r5 : ");
+            appendRegister(text, REGISTER_NAME::x87r6, "x87r6 : ", "x87r6 : ");
+            appendRegister(text, REGISTER_NAME::x87r7, "x87r7 : ", "x87r7 : ");
+            break;
+        case 2:
+            appendRegister(text, REGISTER_NAME::MM0, "MM0 : ", "MM0 : ");
+            appendRegister(text, REGISTER_NAME::MM1, "MM1 : ", "MM1 : ");
+            appendRegister(text, REGISTER_NAME::MM2, "MM2 : ", "MM2 : ");
+            appendRegister(text, REGISTER_NAME::MM3, "MM3 : ", "MM3 : ");
+            appendRegister(text, REGISTER_NAME::MM4, "MM4 : ", "MM4 : ");
+            appendRegister(text, REGISTER_NAME::MM5, "MM5 : ", "MM5 : ");
+            appendRegister(text, REGISTER_NAME::MM6, "MM6 : ", "MM6 : ");
+            appendRegister(text, REGISTER_NAME::MM7, "MM7 : ", "MM7 : ");
+            break;
+        }
         appendRegister(text, REGISTER_NAME::x87TagWord, "x87TagWord : ", "x87TagWord : ");
         appendRegister(text, REGISTER_NAME::x87ControlWord, "x87ControlWord : ", "x87ControlWord : ");
         appendRegister(text, REGISTER_NAME::x87StatusWord, "x87StatusWord : ", "x87StatusWord : ");
@@ -3000,14 +2198,6 @@ void RegistersView::onCopyAllAction()
         appendRegister(text, REGISTER_NAME::MxCsr_DE, "MxCsr_DE : ", "MxCsr_DE : ");
         appendRegister(text, REGISTER_NAME::MxCsr_IE, "MxCsr_IE : ", "MxCsr_IE : ");
         appendRegister(text, REGISTER_NAME::MxCsr_RC, "MxCsr_RC : ", "MxCsr_RC : ");
-        appendRegister(text, REGISTER_NAME::MM0, "MM0 : ", "MM0 : ");
-        appendRegister(text, REGISTER_NAME::MM1, "MM1 : ", "MM1 : ");
-        appendRegister(text, REGISTER_NAME::MM2, "MM2 : ", "MM2 : ");
-        appendRegister(text, REGISTER_NAME::MM3, "MM3 : ", "MM3 : ");
-        appendRegister(text, REGISTER_NAME::MM4, "MM4 : ", "MM4 : ");
-        appendRegister(text, REGISTER_NAME::MM5, "MM5 : ", "MM5 : ");
-        appendRegister(text, REGISTER_NAME::MM6, "MM6 : ", "MM6 : ");
-        appendRegister(text, REGISTER_NAME::MM7, "MM7 : ", "MM7 : ");
         appendRegister(text, REGISTER_NAME::XMM0, "XMM0  : ", "XMM0  : ");
         appendRegister(text, REGISTER_NAME::XMM1, "XMM1  : ", "XMM1  : ");
         appendRegister(text, REGISTER_NAME::XMM2, "XMM2  : ", "XMM2  : ");
@@ -3055,283 +2245,8 @@ void RegistersView::onCopyAllAction()
     Bridge::CopyToClipboard(text);
 }
 
-void RegistersView::onFollowInDisassembly()
-{
-    if(mCANSTOREADDRESS.contains(mSelected))
-    {
-        QString addr = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, mSelected))), mRegisterPlaces[mSelected].valuesize, 16, QChar('0')).toUpper();
-        if(DbgMemIsValidReadPtr((* ((duint*) registerValue(&wRegDumpStruct, mSelected)))))
-            DbgCmdExec(QString().sprintf("disasm \"%s\"", addr.toUtf8().constData()).toUtf8().constData());
-    }
-}
-
-void RegistersView::onFollowInDump()
-{
-    if(mCANSTOREADDRESS.contains(mSelected))
-    {
-        QString addr = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, mSelected))), mRegisterPlaces[mSelected].valuesize, 16, QChar('0')).toUpper();
-        if(DbgMemIsValidReadPtr((* ((duint*) registerValue(&wRegDumpStruct, mSelected)))))
-            DbgCmdExec(QString().sprintf("dump \"%s\"", addr.toUtf8().constData()).toUtf8().constData());
-    }
-}
-
-void RegistersView::onFollowInDumpN()
-{
-    if(mCANSTOREADDRESS.contains(mSelected))
-    {
-        QString addr = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, mSelected))), mRegisterPlaces[mSelected].valuesize, 16, QChar('0')).toUpper();
-        if(DbgMemIsValidReadPtr((* ((duint*) registerValue(&wRegDumpStruct, mSelected)))))
-        {
-            QAction* action = qobject_cast<QAction*>(sender());
-            int numDump = action->data().toInt();
-            DbgCmdExec(QString("dump %1, .%2").arg(addr).arg(numDump).toUtf8().constData());
-        }
-    }
-}
-
-void RegistersView::onFollowInStack()
-{
-    if(mCANSTOREADDRESS.contains(mSelected))
-    {
-        QString addr = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, mSelected))), mRegisterPlaces[mSelected].valuesize, 16, QChar('0')).toUpper();
-        if(DbgMemIsValidReadPtr((* ((duint*) registerValue(&wRegDumpStruct, mSelected)))))
-            DbgCmdExec(QString().sprintf("sdump \"%s\"", addr.toUtf8().constData()).toUtf8().constData());
-    }
-}
-
-void RegistersView::onFollowInMemoryMap()
-{
-    if(mCANSTOREADDRESS.contains(mSelected))
-    {
-        QString addr = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, mSelected))), mRegisterPlaces[mSelected].valuesize, 16, QChar('0')).toUpper();
-        if(DbgMemIsValidReadPtr((* ((duint*) registerValue(&wRegDumpStruct, mSelected)))))
-            DbgCmdExec(QString().sprintf("memmapdump \"%s\"", addr.toUtf8().constData()).toUtf8().constData());
-    }
-}
-
-void RegistersView::onChangeFPUViewAction()
-{
-    if(mShowFpu == true)
-        ShowFPU(false);
-    else
-        ShowFPU(true);
-}
-
-void RegistersView::displayCustomContextMenuSlot(QPoint pos)
-{
-    if(!DbgIsDebugging())
-        return;
-    QMenu wMenu(this);
-    QMenu* followInDumpNMenu = nullptr;
-    const QAction* selectedAction = nullptr;
-    switch(wSIMDRegDispMode)
-    {
-    case SIMD_REG_DISP_HEX:
-        selectedAction = SIMDHex;
-        break;
-    case SIMD_REG_DISP_FLOAT:
-        selectedAction = SIMDFloat;
-        break;
-    case SIMD_REG_DISP_DOUBLE:
-        selectedAction = SIMDDouble;
-        break;
-    case SIMD_REG_DISP_WORD_SIGNED:
-        selectedAction = SIMDSWord;
-        break;
-    case SIMD_REG_DISP_WORD_UNSIGNED:
-        selectedAction = SIMDUWord;
-        break;
-    case SIMD_REG_DISP_WORD_HEX:
-        selectedAction = SIMDHWord;
-        break;
-    case SIMD_REG_DISP_DWORD_SIGNED:
-        selectedAction = SIMDSDWord;
-        break;
-    case SIMD_REG_DISP_DWORD_UNSIGNED:
-        selectedAction = SIMDUDWord;
-        break;
-    case SIMD_REG_DISP_DWORD_HEX:
-        selectedAction = SIMDHDWord;
-        break;
-    case SIMD_REG_DISP_QWORD_SIGNED:
-        selectedAction = SIMDSQWord;
-        break;
-    case SIMD_REG_DISP_QWORD_UNSIGNED:
-        selectedAction = SIMDUQWord;
-        break;
-    case SIMD_REG_DISP_QWORD_HEX:
-        selectedAction = SIMDHQWord;
-        break;
-    }
-    SIMDHex->setChecked(SIMDHex == selectedAction);
-    SIMDFloat->setChecked(SIMDFloat == selectedAction);
-    SIMDDouble->setChecked(SIMDDouble == selectedAction);
-    SIMDSWord->setChecked(SIMDSWord == selectedAction);
-    SIMDUWord->setChecked(SIMDUWord == selectedAction);
-    SIMDHWord->setChecked(SIMDHWord == selectedAction);
-    SIMDSDWord->setChecked(SIMDSDWord == selectedAction);
-    SIMDUDWord->setChecked(SIMDUDWord == selectedAction);
-    SIMDHDWord->setChecked(SIMDHDWord == selectedAction);
-    SIMDSQWord->setChecked(SIMDSQWord == selectedAction);
-    SIMDUQWord->setChecked(SIMDUQWord == selectedAction);
-    SIMDHQWord->setChecked(SIMDHQWord == selectedAction);
-    if(mFpuMode)
-        mSwitchFPUDispMode->setText(tr("Display ST(x)"));
-    else
-        mSwitchFPUDispMode->setText(tr("Display x87rX"));
-    mSwitchFPUDispMode->setChecked(mFpuMode);
-
-    if(mSelected != UNKNOWN)
-    {
-        if(mMODIFYDISPLAY.contains(mSelected))
-        {
-            wMenu.addAction(wCM_Modify);
-        }
-
-        if(mCANSTOREADDRESS.contains(mSelected))
-        {
-            duint addr = (* ((duint*) registerValue(&wRegDumpStruct, mSelected)));
-            if(DbgMemIsValidReadPtr(addr))
-            {
-                wMenu.addAction(wCM_FollowInDump);
-                followInDumpNMenu = new QMenu(tr("Follow in &Dump"), &wMenu);
-                CreateDumpNMenu(followInDumpNMenu);
-                wMenu.addMenu(followInDumpNMenu);
-                wMenu.addAction(wCM_FollowInDisassembly);
-                wMenu.addAction(wCM_FollowInMemoryMap);
-                duint size = 0;
-                duint base = DbgMemFindBaseAddr(DbgValFromString("csp"), &size);
-                if(addr >= base && addr < base + size)
-                    wMenu.addAction(wCM_FollowInStack);
-            }
-        }
-
-        wMenu.addAction(wCM_CopyToClipboard);
-        if(mFPUx87_80BITSDISPLAY.contains(mSelected))
-        {
-            wMenu.addAction(wCM_CopyFloatingPointValueToClipboard);
-        }
-        wMenu.addAction(wCM_CopyAll);
-        if(mLABELDISPLAY.contains(mSelected))
-        {
-            QString symbol = getRegisterLabel(mSelected);
-            if(symbol != "")
-                wMenu.addAction(wCM_CopySymbolToClipboard);
-        }
-
-        if((mGPR.contains(mSelected) && mSelected != REGISTER_NAME::EFLAGS) || mSEGMENTREGISTER.contains(mSelected) || mFPUMMX.contains(mSelected) || mFPUXMM.contains(mSelected) || mFPUYMM.contains(mSelected))
-        {
-            wMenu.addAction(wCM_Highlight);
-        }
-
-        if(mUNDODISPLAY.contains(mSelected) && CompareRegisters(mSelected, &wRegDumpStruct, &wCipRegDumpStruct) != 0)
-        {
-            wMenu.addAction(wCM_Undo);
-        }
-
-        if(mSETONEZEROTOGGLE.contains(mSelected))
-        {
-            if(mSelected >= x87r0 && mSelected <= x87r7 || mSelected >= x87st0 && mSelected <= x87st7)
-            {
-                if(memcmp(registerValue(&wRegDumpStruct, mSelected), "\0\0\0\0\0\0\0\0\0", 10) != 0)
-                    wMenu.addAction(wCM_Zero);
-                if(memcmp(registerValue(&wRegDumpStruct, mSelected), "\0\0\0\0\0\0\0\x80\xFF\x3F", 10) != 0)
-                    wMenu.addAction(wCM_SetToOne);
-            }
-            else
-            {
-                if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) != 0)
-                    wMenu.addAction(wCM_Zero);
-                if((* ((duint*) registerValue(&wRegDumpStruct, mSelected))) == 0)
-                    wMenu.addAction(wCM_SetToOne);
-            }
-        }
-
-        if(mBOOLDISPLAY.contains(mSelected))
-        {
-            wMenu.addAction(wCM_ToggleValue);
-        }
-
-        if(mFPUx87_80BITSDISPLAY.contains(mSelected))
-        {
-            wMenu.addAction(wCM_Incrementx87Stack);
-            wMenu.addAction(wCM_Decrementx87Stack);
-        }
-
-        if(mINCREMENTDECREMET.contains(mSelected))
-        {
-            wMenu.addAction(wCM_Increment);
-            wMenu.addAction(wCM_Decrement);
-            wMenu.addAction(wCM_IncrementPtrSize);
-            wMenu.addAction(wCM_DecrementPtrSize);
-        }
-
-        if(mGPR.contains(mSelected) || mSelected == CIP)
-        {
-            wMenu.addAction(wCM_Push);
-            wMenu.addAction(wCM_Pop);
-        }
-
-        if(mFPUMMX.contains(mSelected) || mFPUXMM.contains(mSelected) || mFPUYMM.contains(mSelected))
-        {
-            wMenu.addMenu(mSwitchSIMDDispMode);
-        }
-        wMenu.addAction(mSwitchFPUDispMode);
-
-        wMenu.exec(this->mapToGlobal(pos));
-    }
-    else
-    {
-        wMenu.addSeparator();
-        wMenu.addAction(wCM_ChangeFPUView);
-        wMenu.addAction(wCM_CopyAll);
-        wMenu.addMenu(mSwitchSIMDDispMode);
-        wMenu.addAction(mSwitchFPUDispMode);
-        wMenu.addSeparator();
-        QAction* wHwbpCsp = wMenu.addAction(DIcon("breakpoint.png"), tr("Set Hardware Breakpoint on %1").arg(ArchValue("ESP", "RSP")));
-        QAction* wAction = wMenu.exec(this->mapToGlobal(pos));
-
-        if(wAction == wHwbpCsp)
-            DbgCmdExec("bphws csp,rw");
-    }
-}
-
-void RegistersView::setRegister(REGISTER_NAME reg, duint value)
-{
-    // is register-id known?
-    if(mRegisterMapping.contains(reg))
-    {
-        // map x87st0 to x87r0
-        QString wRegName;
-        if(reg >= x87st0 && reg <= x87st7)
-            wRegName = QString().sprintf("st%d", reg - x87st0);
-        else
-            // map "cax" to "eax" or "rax"
-            wRegName = mRegisterMapping.constFind(reg).value();
-
-        // flags need to '_' infront
-        if(mFlags.contains(reg))
-            wRegName = "_" + wRegName;
-
-        // we change the value (so highlight it)
-        mRegisterUpdates.insert(reg);
-        // tell everything the compiler
-        if(mFPU.contains(reg))
-            wRegName = "_" + wRegName;
-
-        DbgValToString(wRegName.toUtf8().constData(), value);
-
-        // force repaint
-        emit refresh();
-    }
-}
-
 void RegistersView::debugStateChangedSlot(DBGSTATE state)
 {
-    if(state == stopped)
-    {
-        updateRegistersSlot();
-    }
 }
 
 void RegistersView::reload()
@@ -3739,25 +2654,6 @@ void RegistersView::setRegisters(REGDUMP* reg)
         wCipRegDumpStruct = wRegDumpStruct;
 
     // force repaint
-    emit refresh();
-}
-
-void RegistersView::onSIMDMode()
-{
-    wSIMDRegDispMode = (SIMD_REG_DISP_MODE)(dynamic_cast<QAction*>(sender())->data().toInt());
-    emit refresh();
-}
-
-void RegistersView::onFpuMode()
-{
-    mFpuMode = !mFpuMode;
-    InitMappings();
-    emit refresh();
-}
-
-void RegistersView::disasmSelectionChangedSlot(dsint va)
-{
-    mHighlightRegs = mParent->getDisasmWidget()->DisassembleAt(va - mParent->getDisasmWidget()->getBase()).regsReferenced;
     emit refresh();
 }
 
