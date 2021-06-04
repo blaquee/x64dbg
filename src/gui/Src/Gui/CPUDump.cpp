@@ -5,11 +5,11 @@
 #include <QToolTip>
 #include "Configuration.h"
 #include "Bridge.h"
-#include "LineEditDialog.h"
 #include "HexEditDialog.h"
 #include "CPUMultiDump.h"
 #include "GotoDialog.h"
 #include "CPUDisassembly.h"
+#include "CommonActions.h"
 #include "WordEditDialog.h"
 #include "CodepageSelectionDialog.h"
 #include "MiscUtil.h"
@@ -24,12 +24,10 @@ CPUDump::CPUDump(CPUDisassembly* disas, CPUMultiDump* multiDump, QWidget* parent
     if(BridgeSettingGetUint("Gui", "AsciiSeparator", &setting))
         mAsciiSeparator = setting & 0xF;
 
-    asciiAddressDumpModeUpdatedSlot();
     setView((ViewEnum_t)ConfigUint("HexDump", "DefaultView"));
 
     connect(this, SIGNAL(selectionUpdated()), this, SLOT(selectionUpdatedSlot()));
     connect(this, SIGNAL(headerButtonReleased(int)), this, SLOT(headerButtonReleasedSlot(int)));
-    connect(Config(), SIGNAL(asciiAddressDumpModeUpdated()), this, SLOT(asciiAddressDumpModeUpdatedSlot()));
 
     mPluginMenu = multiDump->mDumpPluginMenu;
 
@@ -41,6 +39,11 @@ void CPUDump::setupContextMenu()
     mMenuBuilder = new MenuBuilder(this, [](QMenu*)
     {
         return DbgIsDebugging();
+    });
+
+    mCommonActions = new CommonActions(this, getActionHelperFuncs(), [this]()
+    {
+        return rvaToVa(getSelectionStart());
     });
 
     MenuBuilder* wBinaryMenu = new MenuBuilder(this);
@@ -77,13 +80,9 @@ void CPUDump::setupContextMenu()
     {
         return DbgFunctions()->PatchInRange(rvaToVa(getSelectionStart()), rvaToVa(getSelectionEnd()));
     });
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("stack.png"), tr("Follow in Stack"), SLOT(followStackSlot()), "ActionFollowStack"), [this](QMenu*)
-    {
-        auto start = rvaToVa(getSelectionStart());
-        return (DbgMemIsValidReadPtr(start) && DbgMemFindBaseAddr(start, 0) == DbgMemFindBaseAddr(DbgValFromString("csp"), 0));
-    });
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("memmap_find_address_page.png"), tr("Follow in Memory Map"), SLOT(followInMemoryMapSlot()), "ActionFollowMemMap"));
-    mMenuBuilder->addAction(makeShortcutAction(DIcon(ArchValue("processor32.png", "processor64.png")), tr("Follow in Disassembler"), SLOT(followInDisasmSlot()), "ActionFollowDisasm"));
+
+    mCommonActions->build(mMenuBuilder, CommonActions::ActionDisasm | CommonActions::ActionMemoryMap | CommonActions::ActionDumpData | CommonActions::ActionDumpN
+                          | CommonActions::ActionDisasmData | CommonActions::ActionStackDump | CommonActions::ActionLabel | CommonActions::ActionWatch);
     auto wIsValidReadPtrCallback = [this](QMenu*)
     {
         duint ptr = 0;
@@ -91,28 +90,6 @@ void CPUDump::setupContextMenu()
         return DbgMemIsValidReadPtr(ptr);
     };
 
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("processor32.png"), ArchValue(tr("&Follow DWORD in Disassembler"), tr("&Follow QWORD in Disassembler")), SLOT(followDataSlot()), "ActionFollowDwordQwordDisasm"), wIsValidReadPtrCallback);
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("dump.png"), ArchValue(tr("&Follow DWORD in Current Dump"), tr("&Follow QWORD in Current Dump")), SLOT(followDataDumpSlot()), "ActionFollowDwordQwordDump"), wIsValidReadPtrCallback);
-
-    MenuBuilder* wFollowInDumpMenu = new MenuBuilder(this, [wIsValidReadPtrCallback, this](QMenu * menu)
-    {
-        if(!wIsValidReadPtrCallback(menu))
-            return false;
-        QList<QString> tabNames;
-        mMultiDump->getTabNames(tabNames);
-        for(int i = 0; i < tabNames.length(); i++)
-            mFollowInDumpActions[i]->setText(tabNames[i]);
-        return true;
-    });
-    int maxDumps = mMultiDump->getMaxCPUTabs();
-    for(int i = 0; i < maxDumps; i++)
-    {
-        QAction* action = makeAction(DIcon("dump.png"), QString(), SLOT(followInDumpNSlot()));
-        wFollowInDumpMenu->addAction(action);
-        mFollowInDumpActions.push_back(action);
-    }
-    mMenuBuilder->addMenu(makeMenu(DIcon("dump.png"), ArchValue(tr("&Follow DWORD in Dump"), tr("&Follow QWORD in Dump"))), wFollowInDumpMenu);
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("label.png"), tr("Set &Label"), SLOT(setLabelSlot()), "ActionSetLabel"));
     mMenuBuilder->addAction(makeShortcutAction(DIcon("modify.png"), tr("&Modify Value"), SLOT(modifyValueSlot()), "ActionModifyValue"), [this](QMenu*)
     {
         return getSizeOf(mDescriptor.at(0).data.itemSize) <= sizeof(duint);
@@ -143,42 +120,42 @@ void CPUDump::setupContextMenu()
     {
         return (DbgGetBpxTypeAt(rvaToVa(getSelectionStart())) & bp_memory) == 0;
     });
-    wHardwareAccessMenu->addAction(makeAction(DIcon("breakpoint_byte.png"), tr("&Byte"), SLOT(hardwareAccess1Slot())));
-    wHardwareAccessMenu->addAction(makeAction(DIcon("breakpoint_word.png"), tr("&Word"), SLOT(hardwareAccess2Slot())));
-    wHardwareAccessMenu->addAction(makeAction(DIcon("breakpoint_dword.png"), tr("&Dword"), SLOT(hardwareAccess4Slot())));
+    wHardwareAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_byte.png"), tr("&Byte"), "bphws $, r, 1"));
+    wHardwareAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_word.png"), tr("&Word"), "bphws $, r, 2"));
+    wHardwareAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_dword.png"), tr("&Dword"), "bphws $, r, 4"));
 #ifdef _WIN64
-    wHardwareAccessMenu->addAction(makeAction(DIcon("breakpoint_qword.png"), tr("&Qword"), SLOT(hardwareAccess8Slot())));
+    wHardwareAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_qword.png"), tr("&Qword"), "bphws $, r, 8"));
 #endif //_WIN64
-    wHardwareWriteMenu->addAction(makeAction(DIcon("breakpoint_byte.png"), tr("&Byte"), SLOT(hardwareWrite1Slot())));
-    wHardwareWriteMenu->addAction(makeAction(DIcon("breakpoint_word.png"), tr("&Word"), SLOT(hardwareWrite2Slot())));
-    wHardwareWriteMenu->addAction(makeAction(DIcon("breakpoint_dword.png"), tr("&Dword"), SLOT(hardwareWrite4Slot())));
+    wHardwareWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_byte.png"), tr("&Byte"), "bphws $, w, 1"));
+    wHardwareWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_word.png"), tr("&Word"), "bphws $, w, 2"));
+    wHardwareWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_dword.png"), tr("&Dword"), "bphws $, w, 4"));
 #ifdef _WIN64
-    wHardwareWriteMenu->addAction(makeAction(DIcon("breakpoint_qword.png"), tr("&Qword"), SLOT(hardwareWrite8Slot())));
+    wHardwareWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_qword.png"), tr("&Qword"), "bphws $, w, 8"));
 #endif //_WIN64
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_access.png"), tr("Hardware, &Access")), wHardwareAccessMenu);
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_write.png"), tr("Hardware, &Write")), wHardwareWriteMenu);
-    wBreakpointMenu->addAction(makeAction(DIcon("breakpoint_execute.png"), tr("Hardware, &Execute"), SLOT(hardwareExecuteSlot())), [this](QMenu*)
+    wBreakpointMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_execute.png"), tr("Hardware, &Execute"), "bphws $, x"), [this](QMenu*)
     {
         return (DbgGetBpxTypeAt(rvaToVa(getSelectionStart())) & bp_hardware) == 0;
     });
-    wBreakpointMenu->addAction(makeAction(DIcon("breakpoint_remove.png"), tr("Remove &Hardware"), SLOT(hardwareRemoveSlot())), [this](QMenu*)
+    wBreakpointMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_remove.png"), tr("Remove &Hardware"), "bphwc $"), [this](QMenu*)
     {
         return (DbgGetBpxTypeAt(rvaToVa(getSelectionStart())) & bp_hardware) != 0;
     });
     wBreakpointMenu->addSeparator();
-    wMemoryAccessMenu->addAction(makeAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), SLOT(memoryAccessSingleshootSlot())));
-    wMemoryAccessMenu->addAction(makeAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), SLOT(memoryAccessRestoreSlot())));
-    wMemoryReadMenu->addAction(makeAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), SLOT(memoryReadSingleshootSlot())));
-    wMemoryReadMenu->addAction(makeAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), SLOT(memoryReadRestoreSlot())));
-    wMemoryWriteMenu->addAction(makeAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), SLOT(memoryWriteSingleshootSlot())));
-    wMemoryWriteMenu->addAction(makeAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), SLOT(memoryWriteRestoreSlot())));
-    wMemoryExecuteMenu->addAction(makeAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), SLOT(memoryExecuteSingleshootSlot())));
-    wMemoryExecuteMenu->addAction(makeAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), SLOT(memoryExecuteRestoreSlot())));
+    wMemoryAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), "bpm $, 0, a"));
+    wMemoryAccessMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), "bpm $, 1, a"));
+    wMemoryReadMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), "bpm $, 0, r"));
+    wMemoryReadMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), "bpm $, 1, r"));
+    wMemoryWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), "bpm $, 0, w"));
+    wMemoryWriteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), "bpm $, 1, w"));
+    wMemoryExecuteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_singleshoot.png"), tr("&Singleshoot"), "bpm $, 0, x"));
+    wMemoryExecuteMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_memory_restore_on_hit.png"), tr("&Restore on hit"), "bpm $, 1, x"));
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_memory_access.png"), tr("Memory, Access")), wMemoryAccessMenu);
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_memory_read.png"), tr("Memory, Read")), wMemoryReadMenu);
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_memory_write.png"), tr("Memory, Write")), wMemoryWriteMenu);
     wBreakpointMenu->addMenu(makeMenu(DIcon("breakpoint_memory_execute.png"), tr("Memory, Execute")), wMemoryExecuteMenu);
-    wBreakpointMenu->addAction(makeAction(DIcon("breakpoint_remove.png"), tr("Remove &Memory"), SLOT(memoryRemoveSlot())), [this](QMenu*)
+    wBreakpointMenu->addAction(mCommonActions->makeCommandAction(DIcon("breakpoint_remove.png"), tr("Remove &Memory"), "bpmc $"), [this](QMenu*)
     {
         return (DbgGetBpxTypeAt(rvaToVa(getSelectionStart())) & bp_memory) != 0;
     });
@@ -188,7 +165,6 @@ void CPUDump::setupContextMenu()
     mMenuBuilder->addAction(makeShortcutAction(DIcon("find.png"), tr("Find &References"), SLOT(findReferencesSlot()), "ActionFindReferences"));
 
     mMenuBuilder->addAction(makeShortcutAction(DIcon("sync.png"), tr("&Sync with expression"), SLOT(syncWithExpressionSlot()), "ActionSyncWithExpression"));
-    mMenuBuilder->addAction(makeShortcutAction(DIcon("animal-dog.png"), ArchValue(tr("Watch DWORD"), tr("Watch QWORD")), SLOT(watchSlot()), "ActionWatchDwordQword"));
     mMenuBuilder->addAction(makeShortcutAction(DIcon("memmap_alloc_memory.png"), tr("Allocate Memory"), SLOT(allocMemorySlot()), "ActionAllocateMemory"));
 
     MenuBuilder* wGotoMenu = new MenuBuilder(this);
@@ -270,7 +246,7 @@ void CPUDump::setupContextMenu()
     wFloatMenu->addAction(makeAction(DIcon("80bit-float.png"), tr("&Long double (80-bit)"), SLOT(floatLongDoubleSlot())));
     mMenuBuilder->addMenu(makeMenu(DIcon("float.png"), tr("&Float")), wFloatMenu);
 
-    mMenuBuilder->addAction(makeAction(DIcon("address.png"), tr("&Address"), SLOT(addressSlot())));
+    mMenuBuilder->addAction(makeAction(DIcon("address.png"), tr("&Address"), SLOT(addressAsciiSlot())));
     mMenuBuilder->addAction(makeAction(DIcon("processor-cpu.png"), tr("&Disassembly"), SLOT(disassemblySlot())));
 
     mMenuBuilder->addSeparator();
@@ -518,39 +494,6 @@ void CPUDump::mouseMoveEvent(QMouseEvent* event)
     QToolTip::showText(event->globalPos(), getTooltipForVa(va, 4));
 
     HexDump::mouseMoveEvent(event);
-}
-
-void CPUDump::setLabelSlot()
-{
-    if(!DbgIsDebugging())
-        return;
-
-    duint wVA = rvaToVa(getSelectionStart());
-    LineEditDialog mLineEdit(this);
-    mLineEdit.setTextMaxLength(MAX_LABEL_SIZE - 2);
-    QString addr_text = ToPtrString(wVA);
-    char label_text[MAX_LABEL_SIZE] = "";
-    if(DbgGetLabelAt((duint)wVA, SEG_DEFAULT, label_text))
-        mLineEdit.setText(QString(label_text));
-    mLineEdit.setWindowTitle(tr("Add label at ") + addr_text);
-restart:
-    if(mLineEdit.exec() != QDialog::Accepted)
-        return;
-    QByteArray utf8data = mLineEdit.editText.toUtf8();
-    if(!utf8data.isEmpty() && DbgIsValidExpression(utf8data.constData()) && DbgValFromString(utf8data.constData()) != wVA)
-    {
-        QMessageBox msg(QMessageBox::Warning, tr("The label may be in use"),
-                        tr("The label \"%1\" may be an existing label or a valid expression. Using such label might have undesired effects. Do you still want to continue?").arg(mLineEdit.editText),
-                        QMessageBox::Yes | QMessageBox::No, this);
-        msg.setWindowIcon(DIcon("compile-warning.png"));
-        msg.setParent(this, Qt::Dialog);
-        msg.setWindowFlags(msg.windowFlags() & (~Qt::WindowContextHelpButtonHint));
-        if(msg.exec() == QMessageBox::No)
-            goto restart;
-    }
-    if(!DbgSetLabelAt(wVA, utf8data.constData()))
-        SimpleErrorBox(this, tr("Error!"), tr("DbgSetLabelAt failed!"));
-    GuiUpdateAllViews();
 }
 
 void CPUDump::modifyValueSlot()
@@ -1221,50 +1164,8 @@ void CPUDump::floatLongDoubleSlot()
     reloadData();
 }
 
-void CPUDump::addressSlot()
-{
-    if(mAsciiAddressDumpMode)
-    {
-        addressAsciiSlot();
-        return;
-    }
-
-    Config()->setUint("HexDump", "DefaultView", (duint)ViewAddress);
-    int charwidth = getCharWidth();
-    ColumnDescriptor wColDesc;
-    DataDescriptor dDesc;
-
-    wColDesc.isData = true; //void*
-    wColDesc.itemCount = 1;
-    wColDesc.separator = 0;
-#ifdef _WIN64
-    wColDesc.data.itemSize = Qword;
-    wColDesc.data.qwordMode = HexQword;
-#else
-    wColDesc.data.itemSize = Dword;
-    wColDesc.data.dwordMode = HexDword;
-#endif
-    appendResetDescriptor(8 + charwidth * 2 * sizeof(duint), tr("Value"), false, wColDesc);
-
-    wColDesc.isData = false; //comments
-    wColDesc.itemCount = 1;
-    wColDesc.separator = 0;
-    dDesc.itemSize = Byte;
-    dDesc.byteMode = AsciiByte;
-    wColDesc.data = dDesc;
-    appendDescriptor(0, tr("Comments"), false, wColDesc);
-
-    reloadData();
-}
-
 void CPUDump::addressAsciiSlot()
 {
-    if(!mAsciiAddressDumpMode)
-    {
-        addressSlot();
-        return;
-    }
-
     Config()->setUint("HexDump", "DefaultView", (duint)ViewAddressAscii);
     int charwidth = getCharWidth();
     ColumnDescriptor wColDesc;
@@ -1310,12 +1211,6 @@ void CPUDump::addressAsciiSlot()
 
 void CPUDump::addressUnicodeSlot()
 {
-    if(!mAsciiAddressDumpMode)
-    {
-        addressSlot();
-        return;
-    }
-
     Config()->setUint("HexDump", "DefaultView", (duint)ViewAddressUnicode);
     int charwidth = getCharWidth();
     ColumnDescriptor wColDesc;
@@ -1388,120 +1283,6 @@ void CPUDump::selectionSet(const SELECTIONDATA* selection)
     expandSelectionUpTo(end - selMin);
     reloadData();
     Bridge::getBridge()->setResult(BridgeResult::SelectionSet, 1);
-}
-
-void CPUDump::memoryAccessSingleshootSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 0, a"));
-}
-
-void CPUDump::memoryAccessRestoreSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 1, a"));
-}
-
-void CPUDump::memoryReadSingleshootSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 0, r"));
-}
-
-void CPUDump::memoryReadRestoreSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 1, r"));
-}
-
-void CPUDump::memoryWriteSingleshootSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 0, w"));
-}
-
-void CPUDump::memoryWriteRestoreSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 1, w"));
-}
-
-void CPUDump::memoryExecuteSingleshootSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 0, x"));
-}
-
-void CPUDump::memoryExecuteRestoreSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpm " + addr_text + ", 1, x"));
-}
-
-void CPUDump::memoryRemoveSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bpmc " + addr_text));
-}
-
-void CPUDump::hardwareAccess1Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", r, 1"));
-}
-
-void CPUDump::hardwareAccess2Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", r, 2"));
-}
-
-void CPUDump::hardwareAccess4Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", r, 4"));
-}
-
-void CPUDump::hardwareAccess8Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", r, 8"));
-}
-
-void CPUDump::hardwareWrite1Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", w, 1"));
-}
-
-void CPUDump::hardwareWrite2Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", w, 2"));
-}
-
-void CPUDump::hardwareWrite4Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", w, 4"));
-}
-
-void CPUDump::hardwareWrite8Slot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", w, 8"));
-}
-
-void CPUDump::hardwareExecuteSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphws " + addr_text + ", x"));
-}
-
-void CPUDump::hardwareRemoveSlot()
-{
-    QString addr_text = ToPtrString(rvaToVa(getSelectionStart()));
-    DbgCmdExec(QString("bphwc " + addr_text));
 }
 
 void CPUDump::findReferencesSlot()
@@ -1660,26 +1441,6 @@ void CPUDump::undoSelectionSlot()
     reloadData();
 }
 
-void CPUDump::followStackSlot()
-{
-    DbgCmdExec(QString("sdump " + ToPtrString(rvaToVa(getSelectionStart()))));
-}
-
-void CPUDump::followInDisasmSlot()
-{
-    DbgCmdExec(QString("disasm " + ToPtrString(rvaToVa(getSelectionStart()))));
-}
-
-void CPUDump::followDataSlot()
-{
-    DbgCmdExec(QString("disasm \"[%1]\"").arg(ToPtrString(rvaToVa(getSelectionStart()))));
-}
-
-void CPUDump::followDataDumpSlot()
-{
-    DbgCmdExec(QString("dump \"[%1]\"").arg(ToPtrString(rvaToVa(getSelectionStart()))));
-}
-
 void CPUDump::selectionUpdatedSlot()
 {
     QString selStart = ToPtrString(rvaToVa(getSelectionStart()));
@@ -1702,18 +1463,6 @@ void CPUDump::syncWithExpressionSlot()
         return;
     mSyncAddrExpression = gotoDialog.expressionText;
     updateDumpSlot();
-}
-
-void CPUDump::followInDumpNSlot()
-{
-    for(int i = 0; i < mFollowInDumpActions.length(); i++)
-        if(mFollowInDumpActions[i] == sender())
-            DbgCmdExec(QString("dump \"[%1]\", \"%2\"").arg(ToPtrString(rvaToVa(getSelectionStart()))).arg(i + 1));
-}
-
-void CPUDump::watchSlot()
-{
-    DbgCmdExec(QString("AddWatch \"[%1]\", \"uint\"").arg(ToPtrString(rvaToVa(getSelectionStart()))));
 }
 
 void CPUDump::allocMemorySlot()
@@ -1806,8 +1555,6 @@ void CPUDump::setView(ViewEnum_t view)
         floatLongDoubleSlot();
         break;
     case ViewAddress:
-        addressSlot();
-        break;
     case ViewAddressAscii:
         addressAsciiSlot();
         break;
@@ -1826,29 +1573,9 @@ void CPUDump::setView(ViewEnum_t view)
     }
 }
 
-void CPUDump::followInMemoryMapSlot()
-{
-    DbgCmdExec(QString("memmapdump %1").arg(ToHexString(rvaToVa(getSelectionStart()))));
-}
-
 void CPUDump::headerButtonReleasedSlot(int colIndex)
 {
     auto callback = mDescriptor[colIndex].columnSwitch;
     if(callback)
         callback();
-}
-
-void CPUDump::asciiAddressDumpModeUpdatedSlot()
-{
-    duint setting = 0;
-    mAsciiAddressDumpMode = BridgeSettingGetUint("Gui", "AsciiAddressDumpMode", &setting) && setting;
-    auto defaultView = (ViewEnum_t)ConfigUint("HexDump", "DefaultView");
-    switch(defaultView)
-    {
-    case ViewAddress:
-    case ViewAddressAscii:
-    case ViewAddressUnicode:
-        setView(defaultView);
-        break;
-    }
 }

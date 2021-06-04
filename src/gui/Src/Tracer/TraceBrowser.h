@@ -8,6 +8,7 @@
 class TraceFileReader;
 class BreakpointMenu;
 class MRUList;
+class CommonActions;
 
 class TraceBrowser : public AbstractTableView
 {
@@ -60,6 +61,7 @@ private:
     ZydisTokenizer::InstructionToken registersTokens(unsigned long long atIndex);
     VaHistory mHistory;
     MenuBuilder* mMenuBuilder;
+    CommonActions* mCommonActions;
     bool mRvaDisplayEnabled;
     duint mRvaDisplayBase;
 
@@ -158,13 +160,10 @@ public slots:
     void onSelectionChanged(unsigned long long selection);
 
     void gotoSlot();
+    void rtrSlot();
     void gotoPreviousSlot();
     void gotoNextSlot();
-    void followDisassemblySlot();
     void enableHighlightingModeSlot();
-    void setLabelSlot();
-    void setCommentSlot();
-    void setBookmarkSlot();
     void mnemonicBriefSlot();
     void mnemonicHelpSlot();
     void copyDisassemblySlot();
@@ -184,6 +183,9 @@ public slots:
     void updateSlot();
 
     void toggleAutoDisassemblyFollowSelectionSlot();
+
+protected:
+    void disasm(unsigned long long index, bool history = true);
 };
 
 #endif //TRACEBROWSER_H

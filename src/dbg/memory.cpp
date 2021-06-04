@@ -130,7 +130,7 @@ void MemUpdateMap()
         {
             // coherence check, rest of code assumes whole module resides in one region
             // in other cases module information cannot be trusted
-            if(base != modBase || currentPage.mbi.RegionSize != ModSizeFromAddr(modBase))
+            if(base != modBase || currentPage.mbi.RegionSize != ROUND_TO_PAGES(ModSizeFromAddr(modBase)))
                 continue;
 
             MEMPAGE newPage;
@@ -215,7 +215,7 @@ void MemUpdateMap()
         // Mark PEB
         if(pageBase == pebBase)
         {
-            strcpy_s(page.info, GuiTranslateText(QT_TRANSLATE_NOOP("DBG", "PEB")));
+            strcpy_s(page.info, "PEB");
             continue;
         }
 

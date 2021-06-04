@@ -133,14 +133,11 @@ bool cbDebugInit(int argc, char* argv[])
         strcpy_s(currentfolder, arg3);
 
     static INIT_STRUCT init;
-    memset(&init, 0, sizeof(INIT_STRUCT));
     init.exe = arg1;
     init.commandline = commandline;
     if(*currentfolder)
         init.currentfolder = currentfolder;
-
-    hDebugLoopThread = CreateThread(nullptr, 0, threadDebugLoop, &init, CREATE_SUSPENDED, nullptr);
-    ResumeThread(hDebugLoopThread);
+    dbgcreatedebugthread(&init);
     return true;
 }
 
@@ -258,17 +255,39 @@ bool cbDebugAttach(int argc, char* argv[])
         if(tid)
             dbgsetresumetid(tid);
     }
-    hDebugLoopThread = CreateThread(nullptr, 0, threadAttachLoop, (void*)pid, CREATE_SUSPENDED, nullptr);
-    ResumeThread(hDebugLoopThread);
+    static INIT_STRUCT init;
+    init.attach = true;
+    init.pid = (DWORD)pid;
+    dbgcreatedebugthread(&init);
+    return true;
+}
+
+static bool dbgdetachDisableAllBreakpoints(const BREAKPOINT* bp)
+{
+    if(bp->enabled)
+    {
+        if(bp->type == BPNORMAL)
+            DeleteBPX(bp->addr);
+        else if(bp->type == BPMEMORY)
+            RemoveMemoryBPX(bp->addr, 0);
+        else if(bp->type == BPHARDWARE && TITANDRXVALID(bp->titantype))
+            DeleteHardwareBreakPoint(TITANGETDRX(bp->titantype));
+    }
     return true;
 }
 
 bool cbDebugDetach(int argc, char* argv[])
 {
-    unlock(WAITID_RUN); //run
-    dbgsetisdetachedbyuser(true); //detach when paused
-    StepInto((void*)cbDetach);
-    DebugBreakProcess(fdProcessInfo->hProcess);
+    PLUG_CB_DETACH detachInfo;
+    detachInfo.fdProcessInfo = fdProcessInfo;
+    plugincbcall(CB_DETACH, &detachInfo);
+    BpEnumAll(dbgdetachDisableAllBreakpoints); // Disable all software breakpoints before detaching.
+    if(!DetachDebuggerEx(fdProcessInfo->dwProcessId))
+        dputs(QT_TRANSLATE_NOOP("DBG", "DetachDebuggerEx failed..."));
+    else
+        dputs(QT_TRANSLATE_NOOP("DBG", "Detached!"));
+    _dbg_animatestop(); // Stop animating
+    unlock(WAITID_RUN); // run to resume the debug loop if necessary
     return true;
 }
 

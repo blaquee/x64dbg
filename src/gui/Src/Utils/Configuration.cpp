@@ -69,23 +69,23 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultColors.insert("DisassemblyFunctionColor", QColor("#000000"));
     defaultColors.insert("DisassemblyLoopColor", QColor("#000000"));
 
+    defaultColors.insert("SideBarBackgroundColor", QColor("#FFF8F0"));
     defaultColors.insert("SideBarCipLabelColor", QColor("#FFFFFF"));
     defaultColors.insert("SideBarCipLabelBackgroundColor", QColor("#4040FF"));
-    defaultColors.insert("SideBarBackgroundColor", QColor("#FFF8F0"));
-    defaultColors.insert("SideBarConditionalJumpLineTrueColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarConditionalJumpLineFalseColor", QColor("#00BBFF"));
-    defaultColors.insert("SideBarUnconditionalJumpLineTrueColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarUnconditionalJumpLineFalseColor", QColor("#00BBFF"));
-    defaultColors.insert("SideBarConditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarConditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
-    defaultColors.insert("SideBarUnconditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
-    defaultColors.insert("SideBarUnconditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
     defaultColors.insert("SideBarBulletColor", QColor("#808080"));
     defaultColors.insert("SideBarBulletBreakpointColor", QColor("#FF0000"));
     defaultColors.insert("SideBarBulletDisabledBreakpointColor", QColor("#00AA00"));
     defaultColors.insert("SideBarBulletBookmarkColor", QColor("#FEE970"));
     defaultColors.insert("SideBarCheckBoxForeColor", QColor("#000000"));
     defaultColors.insert("SideBarCheckBoxBackColor", QColor("#FFFFFF"));
+    defaultColors.insert("SideBarConditionalJumpLineTrueColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarConditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarConditionalJumpLineFalseColor", QColor("#00BBFF"));
+    defaultColors.insert("SideBarConditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
+    defaultColors.insert("SideBarUnconditionalJumpLineTrueColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarUnconditionalJumpLineTrueBackwardsColor", QColor("#FF0000"));
+    defaultColors.insert("SideBarUnconditionalJumpLineFalseColor", QColor("#00BBFF"));
+    defaultColors.insert("SideBarUnconditionalJumpLineFalseBackwardsColor", QColor("#FFA500"));
 
     defaultColors.insert("RegistersBackgroundColor", QColor("#FFF8F0"));
     defaultColors.insert("RegistersColor", QColor("#000000"));
@@ -245,6 +245,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultColors.insert("SymbolLoadingTextColor", QColor("#8B671F"));
     defaultColors.insert("SymbolLoadedTextColor", QColor("#008000"));
     defaultColors.insert("BackgroundFlickerColor", QColor("#ff6961"));
+    defaultColors.insert("LinkColor", QColor("#0000ff"));
 
     //bool settings
     QMap<QString, bool> disassemblyBool;
@@ -284,6 +285,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     guiBool.insert("DisableAutoComplete", false);
     guiBool.insert("CaseSensitiveAutoComplete", false);
     guiBool.insert("AutoRepeatOnEnter", false);
+    guiBool.insert("AutoFollowInStack", true);
     //Named menu settings
     insertMenuBuilderBools(&guiBool, "CPUDisassembly", 50); //CPUDisassembly
     insertMenuBuilderBools(&guiBool, "CPUDump", 50); //CPUDump
@@ -311,7 +313,7 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Watch1", 6);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "BreakpointsView", 7);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "MemoryMap", 8);
-    AbstractTableView::setupColumnConfigDefaultValue(guiUint, "CallStack", 6);
+    AbstractTableView::setupColumnConfigDefaultValue(guiUint, "CallStack", 7);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "SEH", 4);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Script", 3);
     AbstractTableView::setupColumnConfigDefaultValue(guiUint, "Thread", 14);
@@ -380,6 +382,10 @@ Configuration::Configuration() : QObject(), noMoreMsgbox(false)
     defaultShortcuts.insert("FileOpen", Shortcut({tr("File"), tr("Open")}, "F3", true));
     defaultShortcuts.insert("FileAttach", Shortcut({tr("File"), tr("Attach")}, "Alt+A", true));
     defaultShortcuts.insert("FileDetach", Shortcut({tr("File"), tr("Detach")}, "Ctrl+Alt+F2", true));
+    defaultShortcuts.insert("FileDbsave", Shortcut({tr("File"), tr("Save database")}, "", true));
+    defaultShortcuts.insert("FileDbrecovery", Shortcut({tr("File"), tr("Restore backup database")}, "", true));
+    defaultShortcuts.insert("FileDbload", Shortcut({tr("File"), tr("Reload database")}, "", true));
+    defaultShortcuts.insert("FileDbclear", Shortcut({tr("File"), tr("Clear database")}, "", true));
     defaultShortcuts.insert("FileImportDatabase", Shortcut({tr("File"), tr("Import database")}, "", true));
     defaultShortcuts.insert("FileExportDatabase", Shortcut({tr("File"), tr("Export database")}, "", true));
     defaultShortcuts.insert("FileRestartAdmin", Shortcut({tr("File"), tr("Restart as Admin")}, "", true));
@@ -670,21 +676,15 @@ void Configuration::readColors()
 {
     Colors = defaultColors;
     //read config
-    for(int i = 0; i < Colors.size(); i++)
-    {
-        QString id = Colors.keys().at(i);
-        Colors[id] = colorFromConfig(id);
-    }
+    for(auto it = Colors.begin(); it != Colors.end(); ++it)
+        it.value() = colorFromConfig(it.key());
 }
 
 void Configuration::writeColors()
 {
     //write config
-    for(int i = 0; i < Colors.size(); i++)
-    {
-        QString id = Colors.keys().at(i);
-        colorToConfig(id, Colors[id]);
-    }
+    for(auto it = Colors.begin(); it != Colors.end(); ++it)
+        colorToConfig(it.key(), it.value());
     emit colorsUpdated();
 }
 
@@ -692,14 +692,12 @@ void Configuration::readBools()
 {
     Bools = defaultBools;
     //read config
-    for(int i = 0; i < Bools.size(); i++)
+    for(auto itMap = Bools.begin(); itMap != Bools.end(); ++itMap)
     {
-        QString category = Bools.keys().at(i);
-        QMap<QString, bool> & currentBool = Bools[category];
-        for(int j = 0; j < currentBool.size(); j++)
+        const QString & category = itMap.key();
+        for(auto it = itMap.value().begin(); it != itMap.value().end(); it++)
         {
-            QString id = currentBool.keys().at(j);
-            currentBool[id] = boolFromConfig(category, id);
+            it.value() = boolFromConfig(category, it.key());
         }
     }
 }
@@ -707,14 +705,12 @@ void Configuration::readBools()
 void Configuration::writeBools()
 {
     //write config
-    for(int i = 0; i < Bools.size(); i++)
+    for(auto itMap = Bools.cbegin(); itMap != Bools.cend(); ++itMap)
     {
-        QString category = Bools.keys().at(i);
-        QMap<QString, bool>* currentBool = &Bools[category];
-        for(int j = 0; j < currentBool->size(); j++)
+        const QString & category = itMap.key();
+        for(auto it = itMap.value().cbegin(); it != itMap.value().cend(); it++)
         {
-            QString id = (*currentBool).keys().at(j);
-            boolToConfig(category, id, (*currentBool)[id]);
+            boolToConfig(category, it.key(), it.value());
         }
     }
 }
@@ -723,14 +719,12 @@ void Configuration::readUints()
 {
     Uints = defaultUints;
     //read config
-    for(int i = 0; i < Uints.size(); i++)
+    for(auto itMap = Uints.begin(); itMap != Uints.end(); ++itMap)
     {
-        QString category = Uints.keys().at(i);
-        QMap<QString, duint> & currentUint = Uints[category];
-        for(int j = 0; j < currentUint.size(); j++)
+        const QString & category = itMap.key();
+        for(auto it = itMap.value().begin(); it != itMap.value().end(); it++)
         {
-            QString id = currentUint.keys().at(j);
-            currentUint[id] = uintFromConfig(category, id);
+            it.value() = uintFromConfig(category, it.key());
         }
     }
 }
@@ -741,19 +735,17 @@ void Configuration::writeUints()
     bool bSaveLoadTabOrder = ConfigBool("Gui", "LoadSaveTabOrder");
 
     //write config
-    for(int i = 0; i < Uints.size(); i++)
+    for(auto itMap = Uints.cbegin(); itMap != Uints.cend(); ++itMap)
     {
-        QString category = Uints.keys().at(i);
-        QMap<QString, duint>* currentUint = &Uints[category];
-        for(int j = 0; j < currentUint->size(); j++)
+        const QString & category = itMap.key();
+        for(auto it = itMap.value().cbegin(); it != itMap.value().cend(); it++)
         {
-            QString id = (*currentUint).keys().at(j);
-
             // Do not save settings to file if saveLoadTabOrder checkbox is Unchecked
+            const QString & id = it.key();
             if(!bSaveLoadTabOrder && category == "TabOrder" && BridgeSettingGetUint(category.toUtf8().constData(), id.toUtf8().constData(), &setting))
                 continue;
 
-            uintToConfig(category, id, (*currentUint)[id]);
+            uintToConfig(category, id, it.value());
         }
     }
 }
@@ -762,24 +754,21 @@ void Configuration::readFonts()
 {
     Fonts = defaultFonts;
     //read config
-    for(int i = 0; i < Fonts.size(); i++)
+    for(auto it = Fonts.begin(); it != Fonts.end(); ++it)
     {
-        QString id = Fonts.keys().at(i);
+        const QString & id = it.key();
         QFont font = fontFromConfig(id);
         QFontInfo fontInfo(font);
         if(id == "Application" || fontInfo.fixedPitch())
-            Fonts[id] = font;
+            it.value() = font;
     }
 }
 
 void Configuration::writeFonts()
 {
     //write config
-    for(int i = 0; i < Fonts.size(); i++)
-    {
-        QString id = Fonts.keys().at(i);
-        fontToConfig(id, Fonts[id]);
-    }
+    for(auto it = Fonts.cbegin(); it != Fonts.cend(); ++it)
+        fontToConfig(it.key(), it.value());
     emit fontsUpdated();
 }
 

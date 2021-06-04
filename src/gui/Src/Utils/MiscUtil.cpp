@@ -7,12 +7,16 @@
 #include "ComboBoxDialog.h"
 #include "StringUtil.h"
 #include "BrowseDialog.h"
+#include <thread>
 
 void SetApplicationIcon(WId winId)
 {
-    HICON hIcon = LoadIcon(GetModuleHandleW(0), MAKEINTRESOURCE(100));
-    SendMessageW((HWND)winId, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
-    DestroyIcon(hIcon);
+    std::thread([winId]
+    {
+        HICON hIcon = LoadIcon(GetModuleHandleW(0), MAKEINTRESOURCE(100));
+        SendMessageW((HWND)winId, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+        DestroyIcon(hIcon);
+    }).detach();
 }
 
 QByteArray & ByteReverse(QByteArray & array)
@@ -39,7 +43,7 @@ QByteArray ByteReverse(QByteArray && array)
     return array;
 }
 
-bool SimpleInputBox(QWidget* parent, const QString & title, QString defaultValue, QString & output, const QString & placeholderText, QIcon* icon)
+bool SimpleInputBox(QWidget* parent, const QString & title, QString defaultValue, QString & output, const QString & placeholderText, const QIcon* icon)
 {
     LineEditDialog mEdit(parent);
     mEdit.setWindowIcon(icon ? *icon : parent->windowIcon());
@@ -56,7 +60,7 @@ bool SimpleInputBox(QWidget* parent, const QString & title, QString defaultValue
         return false;
 }
 
-bool SimpleChoiceBox(QWidget* parent, const QString & title, QString defaultValue, const QStringList & choices, QString & output, bool editable, const QString & placeholderText, QIcon* icon, int minimumContentsLength)
+bool SimpleChoiceBox(QWidget* parent, const QString & title, QString defaultValue, const QStringList & choices, QString & output, bool editable, const QString & placeholderText, const QIcon* icon, int minimumContentsLength)
 {
     ComboBoxDialog mChoice(parent);
     mChoice.setWindowIcon(icon ? *icon : parent->windowIcon());
@@ -169,6 +173,7 @@ QIcon getFileIcon(QString file)
     return result;
 }
 
+//Export table in CSV. TODO: Display a dialog where the user choose what column to export and in which encoding
 bool ExportCSV(dsint rows, dsint columns, std::vector<QString> headers, std::function<QString(dsint, dsint)> getCellContent)
 {
     BrowseDialog browse(nullptr, QApplication::translate("ExportCSV", "Export data in CSV format"), QApplication::translate("ExportCSV", "Enter the CSV file name to export"), QApplication::translate("ExportCSV", "CSV files (*.csv);;All files (*.*)"), QApplication::applicationDirPath() + QDir::separator() + "db", true);
@@ -314,6 +319,11 @@ bool isEaster()
     int MM = ((OG + OE) > 31) ? 4 : 3;
     int DD = (((OG + OE) % 31) == 0) ? 31 : ((OG + OE) % 31);
     return date.month() == MM && date.day() >= DD - 2 && date.day() <= DD + 1;
+}
+
+bool isSeasonal()
+{
+    return (isChristmas() || isEaster());
 }
 
 QString couldItBeSeasonal(QString icon)

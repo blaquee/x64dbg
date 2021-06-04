@@ -665,19 +665,19 @@ void RegistersView::InitMappings()
     mRowsNeeded = offset + 1;
 }
 
-static QAction* setupAction(const QIcon & icon, const QString & text, RegistersView* this_object)
+QAction* RegistersView::setupAction(const QIcon & icon, const QString & text)
 {
-    QAction* action = new QAction(icon, text, this_object);
+    QAction* action = new QAction(icon, text, this);
     action->setShortcutContext(Qt::WidgetShortcut);
-    this_object->addAction(action);
+    addAction(action);
     return action;
 }
 
-static QAction* setupAction(const QString & text, RegistersView* this_object)
+QAction* RegistersView::setupAction(const QString & text)
 {
-    QAction* action = new QAction(text, this_object);
+    QAction* action = new QAction(text, this);
     action->setShortcutContext(Qt::WidgetShortcut);
-    this_object->addAction(action);
+    addAction(action);
     return action;
 }
 
@@ -1149,6 +1149,108 @@ RegistersView::RegistersView(QWidget* parent) : QScrollArea(parent), mVScrollOff
 
     InitMappings();
 
+    // Context Menu
+    this->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    wCM_CopyToClipboard = setupAction(DIcon("copy.png"), tr("Copy value"));
+    wCM_CopyFloatingPointValueToClipboard = setupAction(DIcon("copy.png"), tr("Copy floating point value"));
+    wCM_CopySymbolToClipboard = setupAction(DIcon("pdb.png"), tr("Copy Symbol Value"));
+    wCM_CopyAll = setupAction(DIcon("copy-alt.png"), tr("Copy all registers"));
+    wCM_ChangeFPUView = new QAction(DIcon("change-view.png"), tr("Change view"), this);
+    mSwitchSIMDDispMode = new QMenu(tr("Change SIMD Register Display Mode"), this);
+    mSwitchSIMDDispMode->setIcon(DIcon("simdmode.png"));
+    mDisplaySTX = new QAction(tr("Display ST(x)"), this);
+    mDisplayx87rX = new QAction(tr("Display x87rX"), this);
+    mDisplayMMX = new QAction(tr("Display MMX"), this);
+
+    // Create the SIMD display mode actions
+    SIMDHex = new QAction(tr("Hexadecimal"), mSwitchSIMDDispMode);
+    SIMDFloat = new QAction(tr("Float"), mSwitchSIMDDispMode);
+    SIMDDouble = new QAction(tr("Double"), mSwitchSIMDDispMode);
+    SIMDSWord = new QAction(tr("Signed Word"), mSwitchSIMDDispMode);
+    SIMDSDWord = new QAction(tr("Signed Dword"), mSwitchSIMDDispMode);
+    SIMDSQWord = new QAction(tr("Signed Qword"), mSwitchSIMDDispMode);
+    SIMDUWord = new QAction(tr("Unsigned Word"), mSwitchSIMDDispMode);
+    SIMDUDWord = new QAction(tr("Unsigned Dword"), mSwitchSIMDDispMode);
+    SIMDUQWord = new QAction(tr("Unsigned Qword"), mSwitchSIMDDispMode);
+    SIMDHWord = new QAction(tr("Hexadecimal Word"), mSwitchSIMDDispMode);
+    SIMDHDWord = new QAction(tr("Hexadecimal Dword"), mSwitchSIMDDispMode);
+    SIMDHQWord = new QAction(tr("Hexadecimal Qword"), mSwitchSIMDDispMode);
+    // Set the user data of these actions to the config value
+    SIMDHex->setData(QVariant(0));
+    SIMDFloat->setData(QVariant(1));
+    SIMDDouble->setData(QVariant(2));
+    SIMDSWord->setData(QVariant(3));
+    SIMDUWord->setData(QVariant(6));
+    SIMDHWord->setData(QVariant(9));
+    SIMDSDWord->setData(QVariant(4));
+    SIMDUDWord->setData(QVariant(7));
+    SIMDHDWord->setData(QVariant(10));
+    SIMDSQWord->setData(QVariant(5));
+    SIMDUQWord->setData(QVariant(8));
+    SIMDHQWord->setData(QVariant(11));
+    mDisplaySTX->setData(QVariant(0));
+    mDisplayx87rX->setData(QVariant(1));
+    mDisplayMMX->setData(QVariant(2));
+    connect(SIMDHex, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDFloat, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDDouble, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHDWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDSQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDUQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(SIMDHQWord, SIGNAL(triggered()), this, SLOT(onSIMDMode()));
+    connect(mDisplaySTX, SIGNAL(triggered()), this, SLOT(onFpuMode()));
+    connect(mDisplayx87rX, SIGNAL(triggered()), this, SLOT(onFpuMode()));
+    connect(mDisplayMMX, SIGNAL(triggered()), this, SLOT(onFpuMode()));
+    // Make SIMD display mode actions checkable and unchecked
+    SIMDHex->setCheckable(true);
+    SIMDFloat->setCheckable(true);
+    SIMDDouble->setCheckable(true);
+    SIMDSWord->setCheckable(true);
+    SIMDUWord->setCheckable(true);
+    SIMDHWord->setCheckable(true);
+    SIMDSDWord->setCheckable(true);
+    SIMDUDWord->setCheckable(true);
+    SIMDHDWord->setCheckable(true);
+    SIMDSQWord->setCheckable(true);
+    SIMDUQWord->setCheckable(true);
+    SIMDHQWord->setCheckable(true);
+    SIMDHex->setChecked(true);
+    SIMDFloat->setChecked(false);
+    SIMDDouble->setChecked(false);
+    SIMDSWord->setChecked(false);
+    SIMDUWord->setChecked(false);
+    SIMDHWord->setChecked(false);
+    SIMDSDWord->setChecked(false);
+    SIMDUDWord->setChecked(false);
+    SIMDHDWord->setChecked(false);
+    SIMDSQWord->setChecked(false);
+    SIMDUQWord->setChecked(false);
+    SIMDHQWord->setChecked(false);
+    mSwitchSIMDDispMode->addAction(SIMDHex);
+    mSwitchSIMDDispMode->addAction(SIMDFloat);
+    mSwitchSIMDDispMode->addAction(SIMDDouble);
+    mSwitchSIMDDispMode->addAction(SIMDSWord);
+    mSwitchSIMDDispMode->addAction(SIMDSDWord);
+    mSwitchSIMDDispMode->addAction(SIMDSQWord);
+    mSwitchSIMDDispMode->addAction(SIMDUWord);
+    mSwitchSIMDDispMode->addAction(SIMDUDWord);
+    mSwitchSIMDDispMode->addAction(SIMDUQWord);
+    mSwitchSIMDDispMode->addAction(SIMDHWord);
+    mSwitchSIMDDispMode->addAction(SIMDHDWord);
+    mSwitchSIMDDispMode->addAction(SIMDHQWord);
+
+    connect(wCM_CopyToClipboard, SIGNAL(triggered()), this, SLOT(onCopyToClipboardAction()));
+    connect(wCM_CopyFloatingPointValueToClipboard, SIGNAL(triggered()), this, SLOT(onCopyFloatingPointToClipboardAction()));
+    connect(wCM_CopySymbolToClipboard, SIGNAL(triggered()), this, SLOT(onCopySymbolToClipboardAction()));
+    connect(wCM_CopyAll, SIGNAL(triggered()), this, SLOT(onCopyAllAction()));
+    connect(wCM_ChangeFPUView, SIGNAL(triggered()), this, SLOT(onChangeFPUViewAction()));
+
     memset(&wRegDumpStruct, 0, sizeof(REGDUMP));
     memset(&wCipRegDumpStruct, 0, sizeof(REGDUMP));
     mCip = 0;
@@ -1162,6 +1264,9 @@ RegistersView::RegistersView(QWidget* parent) : QScrollArea(parent), mVScrollOff
 
 void RegistersView::refreshShortcutsSlot()
 {
+    wCM_CopyToClipboard->setShortcut(ConfigShortcut("ActionCopy"));
+    wCM_CopySymbolToClipboard->setShortcut(ConfigShortcut("ActionCopySymbol"));
+    wCM_CopyAll->setShortcut(ConfigShortcut("ActionCopyAllRegisters"));
 }
 
 /**
@@ -1487,14 +1592,42 @@ void RegistersView::paintEvent(QPaintEvent* event)
 
 void RegistersView::keyPressEvent(QKeyEvent* event)
 {
+    if(isActive)
+    {
+        int key = event->key();
+        REGISTER_NAME newRegister = UNKNOWN;
+
+        switch(key)
+        {
+        case Qt::Key_Left:
+            newRegister = mRegisterRelativePlaces[mSelected].left;
+            break;
+        case Qt::Key_Right:
+            newRegister = mRegisterRelativePlaces[mSelected].right;
+            break;
+        case Qt::Key_Up:
+            newRegister = mRegisterRelativePlaces[mSelected].up;
+            break;
+        case Qt::Key_Down:
+            newRegister = mRegisterRelativePlaces[mSelected].down;
+            break;
+        }
+
+        if(newRegister != UNKNOWN)
+        {
+            mSelected = newRegister;
+            ensureRegisterVisible(newRegister);
+            emit refresh();
+        }
+    }
     QScrollArea::keyPressEvent(event);
 }
 
-QSize RegistersView::sizeHint() const
-{
-    // 32 character width
-    return QSize(32 * mCharWidth, this->viewport()->height());
-}
+//QSize RegistersView::sizeHint() const
+//{
+//    // 32 character width
+//    return QSize(32 * mCharWidth, this->viewport()->height());
+//}
 
 void* RegistersView::operator new(size_t size)
 {
@@ -1516,6 +1649,7 @@ QString RegistersView::getRegisterLabel(REGISTER_NAME register_selected)
     char label_text[MAX_LABEL_SIZE] = "";
     char module_text[MAX_MODULE_SIZE] = "";
     char string_text[MAX_STRING_SIZE] = "";
+    char status_text[MAX_STRING_SIZE] = "";
 
     QString valueText = QString("%1").arg((* ((duint*) registerValue(&wRegDumpStruct, register_selected))), mRegisterPlaces[register_selected].valuesize, 16, QChar('0')).toUpper();
     duint register_value = (* ((duint*) registerValue(&wRegDumpStruct, register_selected)));
@@ -1524,10 +1658,19 @@ QString RegistersView::getRegisterLabel(REGISTER_NAME register_selected)
     bool hasString = DbgGetStringAt(register_value, string_text);
     bool hasLabel = DbgGetLabelAt(register_value, SEG_DEFAULT, label_text);
     bool hasModule = DbgGetModuleAt(register_value, module_text);
+    bool hasStatusCode = register_selected == REGISTER_NAME::CAX && (register_value & ArchValue(0xF0000000, 0xFFFFFFFFF0000000)) == 0xC0000000;
+    hasStatusCode = hasStatusCode && DbgFunctions()->StringFormatInline(QString().sprintf("{ntstatus@%X}", register_value).toUtf8().constData(), sizeof(status_text), status_text);
 
     if(hasString && !mONLYMODULEANDLABELDISPLAY.contains(register_selected))
     {
         newText = string_text;
+    }
+    else if(hasStatusCode)
+    {
+        auto colon = strchr(status_text, ':');
+        if(colon)
+            *colon = '\0';
+        newText = status_text;
     }
     else if(hasLabel && hasModule)
     {
@@ -2068,9 +2211,101 @@ void RegistersView::appendRegister(QString & text, REGISTER_NAME reg, const char
     text.append("\r\n");
 }
 
+void RegistersView::setupSIMDModeMenu()
+{
+    const QAction* selectedAction = nullptr;
+    // Find out which mode is selected by the user
+    switch(ConfigUint("Gui", "SIMDRegistersDisplayMode"))
+    {
+    case 0:
+        selectedAction = SIMDHex;
+        break;
+    case 1:
+        selectedAction = SIMDFloat;
+        break;
+    case 2:
+        selectedAction = SIMDDouble;
+        break;
+    case 3:
+        selectedAction = SIMDSWord;
+        break;
+    case 6:
+        selectedAction = SIMDUWord;
+        break;
+    case 9:
+        selectedAction = SIMDHWord;
+        break;
+    case 4:
+        selectedAction = SIMDSDWord;
+        break;
+    case 7:
+        selectedAction = SIMDUDWord;
+        break;
+    case 10:
+        selectedAction = SIMDHDWord;
+        break;
+    case 5:
+        selectedAction = SIMDSQWord;
+        break;
+    case 8:
+        selectedAction = SIMDUQWord;
+        break;
+    case 11:
+        selectedAction = SIMDHQWord;
+        break;
+    }
+    // Check that action if it is selected, uncheck otherwise
+    SIMDHex->setChecked(SIMDHex == selectedAction);
+    SIMDFloat->setChecked(SIMDFloat == selectedAction);
+    SIMDDouble->setChecked(SIMDDouble == selectedAction);
+    SIMDSWord->setChecked(SIMDSWord == selectedAction);
+    SIMDUWord->setChecked(SIMDUWord == selectedAction);
+    SIMDHWord->setChecked(SIMDHWord == selectedAction);
+    SIMDSDWord->setChecked(SIMDSDWord == selectedAction);
+    SIMDUDWord->setChecked(SIMDUDWord == selectedAction);
+    SIMDHDWord->setChecked(SIMDHDWord == selectedAction);
+    SIMDSQWord->setChecked(SIMDSQWord == selectedAction);
+    SIMDUQWord->setChecked(SIMDUQWord == selectedAction);
+    SIMDHQWord->setChecked(SIMDHQWord == selectedAction);
+}
+
 void RegistersView::onChangeFPUViewAction()
 {
     ShowFPU(!mShowFpu);
+}
+
+void RegistersView::onSIMDMode()
+{
+    Config()->setUint("Gui", "SIMDRegistersDisplayMode", dynamic_cast<QAction*>(sender())->data().toInt());
+    emit refresh();
+    GuiUpdateDisassemblyView(); // refresh display mode for data in disassembly
+}
+
+void RegistersView::onFpuMode()
+{
+    mFpuMode = (char)(dynamic_cast<QAction*>(sender())->data().toInt());
+    InitMappings();
+    emit refresh();
+}
+
+void RegistersView::onCopyToClipboardAction()
+{
+    Bridge::CopyToClipboard(GetRegStringValueFromValue(mSelected, registerValue(&wRegDumpStruct, mSelected)));
+}
+
+void RegistersView::onCopyFloatingPointToClipboardAction()
+{
+    Bridge::CopyToClipboard(ToLongDoubleString(((X87FPUREGISTER*) registerValue(&wRegDumpStruct, mSelected))->data));
+}
+
+void RegistersView::onCopySymbolToClipboardAction()
+{
+    if(mLABELDISPLAY.contains(mSelected))
+    {
+        QString symbol = getRegisterLabel(mSelected);
+        if(symbol != "")
+            Bridge::CopyToClipboard(symbol);
+    }
 }
 
 void RegistersView::onCopyAllAction()
@@ -2292,8 +2527,8 @@ int RegistersView::CompareRegisters(const REGISTER_NAME reg_name, REGDUMP* regdu
 
     if(size != 0)
         return memcmp(reg1_data, reg2_data, size);
-
-    return -1;
+    else
+        return -1;
 }
 
 char* RegistersView::registerValue(const REGDUMP* regd, const REGISTER_NAME reg)
@@ -2657,6 +2892,7 @@ void RegistersView::setRegisters(REGDUMP* reg)
     emit refresh();
 }
 
+// Scroll the viewport so that the register will be visible on the screen
 void RegistersView::ensureRegisterVisible(REGISTER_NAME reg)
 {
     QScrollArea* upperScrollArea = (QScrollArea*)this->parentWidget()->parentWidget();

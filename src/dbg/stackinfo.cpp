@@ -103,14 +103,6 @@ bool stackcommentget(duint addr, STACK_COMMENT* comment)
         return true;
     }
 
-    //string
-    char string[MAX_STRING_SIZE] = "";
-    if(DbgGetStringAt(data, string))
-    {
-        strncpy_s(comment->comment, string, _TRUNCATE);
-        return true;
-    }
-
     //label
     char label[MAX_LABEL_SIZE] = "";
     BRIDGE_ADDRINFO addrinfo;
@@ -131,6 +123,14 @@ bool stackcommentget(duint addr, STACK_COMMENT* comment)
     else if(*label) //label only
     {
         sprintf_s(comment->comment, "<%s>", label);
+        return true;
+    }
+
+    //string
+    char string[MAX_STRING_SIZE] = "";
+    if(DbgGetStringAt(data, string))
+    {
+        strncpy_s(comment->comment, string, _TRUNCATE);
         return true;
     }
 
@@ -158,20 +158,17 @@ static PVOID CALLBACK StackSymFunctionTableAccess64(HANDLE hProcess, DWORD64 Add
 #ifdef _WIN64
     // https://github.com/dotnet/coreclr/blob/master/src/unwinder/amd64/dbs_stack_x64.cpp
     MODINFO* info = ModInfoFromAddr(AddrBase);
-    if(!info)
-        return nullptr;
-
-    DWORD rva = DWORD(AddrBase - info->base);
-    auto found = std::lower_bound(info->runtimeFunctions.begin(), info->runtimeFunctions.end(), rva, [](const RUNTIME_FUNCTION & a, const DWORD & rva)
+    if(info)
     {
-        return a.EndAddress <= rva;
-    });
-
-    if(found != info->runtimeFunctions.end() && rva >= found->BeginAddress)
-        return &found->BeginAddress;
-#endif // _WIN64
-
+        return (PVOID)info->findRuntimeFunction(DWORD(AddrBase - info->base));
+    }
+    else
+    {
+        return nullptr;
+    }
+#else
     return SymFunctionTableAccess64(hProcess, AddrBase);
+#endif // _WIN64
 }
 
 static DWORD64 CALLBACK StackGetModuleBaseProc64(HANDLE hProcess, DWORD64 Address)
@@ -309,7 +306,7 @@ void stackgetcallstack(duint csp, std::vector<CALLSTACKENTRY> & callstackVector,
         DWORD machineType = IMAGE_FILE_MACHINE_AMD64;
         frame.AddrPC.Offset = context.Rip;
         frame.AddrPC.Mode = AddrModeFlat;
-        frame.AddrFrame.Offset = context.Rsp;
+        frame.AddrFrame.Offset = context.Rbp;
         frame.AddrFrame.Mode = AddrModeFlat;
         frame.AddrStack.Offset = csp;
         frame.AddrStack.Mode = AddrModeFlat;
@@ -358,6 +355,103 @@ void stackgetcallstack(duint csp, std::vector<CALLSTACKENTRY> & callstackVector,
     if(CallstackCache.size() > MAX_CALLSTACK_CACHE)
         CallstackCache.clear();
     CallstackCache[csp] = callstackVector;
+}
+
+void stackgetcallstackbythread(HANDLE thread, CALLSTACK* callstack)
+{
+    std::vector<CALLSTACKENTRY> callstackVector;
+    duint csp = GetContextDataEx(thread, UE_CSP);
+    // Gather context data
+    CONTEXT context;
+    memset(&context, 0, sizeof(CONTEXT));
+
+    context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+
+    if(SuspendThread(thread) == -1)
+        return;
+
+    if(!GetThreadContext(thread, &context))
+        return;
+
+    if(ResumeThread(thread) == -1)
+        return;
+
+    if(ShowSuspectedCallStack)
+    {
+        stackgetsuspectedcallstack(csp, callstackVector);
+    }
+    else
+    {
+        // Set up all frame data
+        STACKFRAME64 frame;
+        ZeroMemory(&frame, sizeof(STACKFRAME64));
+
+#ifdef _M_IX86
+        DWORD machineType = IMAGE_FILE_MACHINE_I386;
+        frame.AddrPC.Offset = context.Eip;
+        frame.AddrPC.Mode = AddrModeFlat;
+        frame.AddrFrame.Offset = context.Ebp;
+        frame.AddrFrame.Mode = AddrModeFlat;
+        frame.AddrStack.Offset = csp;
+        frame.AddrStack.Mode = AddrModeFlat;
+#elif _M_X64
+        DWORD machineType = IMAGE_FILE_MACHINE_AMD64;
+        frame.AddrPC.Offset = context.Rip;
+        frame.AddrPC.Mode = AddrModeFlat;
+        frame.AddrFrame.Offset = context.Rbp;
+        frame.AddrFrame.Mode = AddrModeFlat;
+        frame.AddrStack.Offset = csp;
+        frame.AddrStack.Mode = AddrModeFlat;
+#endif
+
+        const int MaxWalks = 50;
+        // Container for each callstack entry (50 pre-allocated entries)
+        callstackVector.clear();
+        callstackVector.reserve(MaxWalks);
+
+        for(auto i = 0; i < MaxWalks; i++)
+        {
+            if(!SafeStackWalk64(
+                        machineType,
+                        fdProcessInfo->hProcess,
+                        thread,
+                        &frame,
+                        &context,
+                        StackReadProcessMemoryProc64,
+                        StackSymFunctionTableAccess64,
+                        StackGetModuleBaseProc64,
+                        StackTranslateAddressProc64))
+            {
+                // Maybe it failed, maybe we have finished walking the stack
+                break;
+            }
+
+            if(frame.AddrPC.Offset != 0)
+            {
+                // Valid frame
+                CALLSTACKENTRY entry;
+                memset(&entry, 0, sizeof(CALLSTACKENTRY));
+
+                StackEntryFromFrame(&entry, (duint)frame.AddrFrame.Offset + sizeof(duint), (duint)frame.AddrPC.Offset, (duint)frame.AddrReturn.Offset);
+                callstackVector.push_back(entry);
+            }
+            else
+            {
+                // Base reached
+                break;
+            }
+        }
+    }
+
+    callstack->total = (int)callstackVector.size();
+
+    if(callstack->total > 0)
+    {
+        callstack->entries = (CALLSTACKENTRY*)BridgeAlloc(callstack->total * sizeof(CALLSTACKENTRY));
+
+        // Copy data directly from the vector
+        memcpy(callstack->entries, callstackVector.data(), callstack->total * sizeof(CALLSTACKENTRY));
+    }
 }
 
 void stackgetcallstack(duint csp, CALLSTACK* callstack)

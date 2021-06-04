@@ -2,6 +2,8 @@
 #define SETTINGSDIALOG_H
 
 #include <QDialog>
+#include <QListWidgetItem>
+#include "Imports.h"
 
 namespace Ui
 {
@@ -28,19 +30,25 @@ private slots:
     void on_btnSave_clicked();
     //Event tab
     void on_chkSystemBreakpoint_stateChanged(int arg1);
+    void on_chkExitBreakpoint_stateChanged(int arg1);
     void on_chkTlsCallbacks_stateChanged(int arg1);
+    void on_chkTlsCallbacksSystem_stateChanged(int arg1);
     void on_chkEntryBreakpoint_stateChanged(int arg1);
     void on_chkDllEntry_stateChanged(int arg1);
+    void on_chkDllEntrySystem_stateChanged(int arg1);
     void on_chkThreadEntry_stateChanged(int arg1);
-    void on_chkAttachBreakpoint_stateChanged(int arg1);
     void on_chkDllLoad_stateChanged(int arg1);
     void on_chkDllUnload_stateChanged(int arg1);
+    void on_chkDllLoadSystem_stateChanged(int arg1);
+    void on_chkDllUnloadSystem_stateChanged(int arg1);
     void on_chkThreadStart_stateChanged(int arg1);
     void on_chkThreadEnd_stateChanged(int arg1);
     void on_chkDebugStrings_stateChanged(int arg1);
     //Engine tab
     void on_radioUnsigned_clicked();
     void on_radioSigned_clicked();
+    void on_radioTitanEngine_clicked();
+    void on_radioGleeBug_clicked();
     void on_radioInt3Short_clicked();
     void on_radioInt3Long_clicked();
     void on_radioUd2_clicked();
@@ -59,9 +67,17 @@ private slots:
     void on_spinMaxTraceCount_valueChanged(int arg1);
     void on_spinAnimateInterval_valueChanged(int arg1);
     //Exception tab
-    void on_btnAddRange_clicked();
+    void on_btnIgnoreRange_clicked();
     void on_btnDeleteRange_clicked();
-    void on_btnAddLast_clicked();
+    void on_btnIgnoreLast_clicked();
+    void on_listExceptions_currentItemChanged(QListWidgetItem* current, QListWidgetItem* previous);
+    void on_listExceptions_itemClicked(QListWidgetItem* item);
+    void on_radioFirstChance_clicked();
+    void on_radioSecondChance_clicked();
+    void on_radioDoNotBreak_clicked();
+    void on_chkLogException_stateChanged(int arg1);
+    void on_radioHandledByDebugger_clicked();
+    void on_radioHandledByDebuggee_clicked();
     //Disasm tab
     void on_chkArgumentSpaces_stateChanged(int arg1);
     void on_chkHidePointerSizes_stateChanged(int arg1);
@@ -76,6 +92,7 @@ private slots:
     void on_chk0xPrefixValues_toggled(bool checked);
     void on_chkNoBranchDisasmPreview_toggled(bool checked);
     void on_chkNoSourceLinesAutoComments_toggled(bool checked);
+    void on_chkDoubleClickAssemble_toggled(bool checked);
     void on_spinMaximumModuleNameSize_valueChanged(int arg1);
     //Gui Tab
     void on_chkFpuRegistersLittleEndian_stateChanged(int arg1);
@@ -87,7 +104,8 @@ private slots:
     void on_chkNoForegroundWindow_toggled(bool checked);
     void on_chkShowExitConfirmation_toggled(bool checked);
     void on_chkDisableAutoComplete_toggled(bool checked);
-    void on_chkAsciiAddressDumpMode_toggled(bool checked);
+    void on_chkAutoFollowInStack_toggled(bool checked);
+    void on_chkHideSeasonalIcons_toggled(bool checked);
     //Misc tab
     void on_chkSetJIT_stateChanged(int arg1);
     void on_chkConfirmBeforeAtt_stateChanged(int arg1);
@@ -116,6 +134,19 @@ private:
         break_ud2 = 2
     };
 
+    enum class ExceptionBreakOn
+    {
+        FirstChance,
+        SecondChance,
+        DoNotBreak
+    };
+
+    enum class ExceptionHandledBy
+    {
+        Debugger,
+        Debuggee
+    };
+
     //structures
     struct RangeStruct
     {
@@ -123,11 +154,19 @@ private:
         unsigned long end;
     };
 
-    struct RangeStructLess
+    struct ExceptionFilter
     {
-        bool operator()(const RangeStruct a, const RangeStruct b) const
+        RangeStruct range;
+        ExceptionBreakOn breakOn;
+        bool logException;
+        ExceptionHandledBy handledBy;
+    };
+
+    struct ExceptionFilterLess
+    {
+        bool operator()(const ExceptionFilter a, const ExceptionFilter b) const
         {
-            return a.start < b.start;
+            return a.range.start < b.range.start;
         }
     };
 
@@ -135,18 +174,23 @@ private:
     {
         //Event Tab
         bool eventSystemBreakpoint;
+        bool eventExitBreakpoint;
         bool eventTlsCallbacks;
+        bool eventTlsCallbacksSystem;
         bool eventEntryBreakpoint;
         bool eventDllEntry;
+        bool eventDllEntrySystem;
         bool eventThreadEntry;
-        bool eventAttachBreakpoint;
         bool eventDllLoad;
         bool eventDllUnload;
+        bool eventDllLoadSystem;
+        bool eventDllUnloadSystem;
         bool eventThreadStart;
         bool eventThreadEnd;
         bool eventDebugStrings;
         //Engine Tab
         CalcType engineCalcType;
+        DEBUG_ENGINE engineType;
         BreakpointType engineBreakpointType;
         bool engineUndecorateSymbolNames;
         bool engineEnableDebugPrivilege;
@@ -163,7 +207,7 @@ private:
         int engineMaxTraceCount;
         int engineAnimateInterval;
         //Exception Tab
-        QList<RangeStruct>* exceptionRanges;
+        QList<ExceptionFilter>* exceptionFilters;
         //Disasm Tab
         bool disasmArgumentSpaces;
         bool disasmMemorySpaces;
@@ -178,6 +222,7 @@ private:
         bool disasm0xPrefixValues;
         bool disasmNoBranchDisasmPreview;
         bool disasmNoSourceLineAutoComments;
+        bool disasmAssembleOnDoubleClick;
         int disasmMaxModuleSize;
         //Gui Tab
         bool guiFpuRegistersLittleEndian;
@@ -191,7 +236,8 @@ private:
         bool guiGraphZoomMode;
         bool guiShowExitConfirmation;
         bool guiDisableAutoComplete;
-        bool guiAsciiAddressDumpMode;
+        bool guiAutoFollowInStack;
+        bool guiHideSeasonalIcons;
         //Misc Tab
         bool miscSetJIT;
         bool miscSetJITAuto;
@@ -207,19 +253,22 @@ private:
     //variables
     Ui::SettingsDialog* ui;
     SettingsStruct settings;
-    QList<RangeStruct> realExceptionRanges;
+    QList<ExceptionFilter> realExceptionFilters;
+    std::unordered_map<duint, const char*> exceptionNames;
     bool bJitOld;
     bool bJitAutoOld;
     bool bGuiOptionsUpdated;
     bool bTokenizerConfigUpdated;
     bool bDisableAutoCompleteUpdated;
-    bool bAsciiAddressDumpModeUpdated;
 
     //functions
     void GetSettingBool(const char* section, const char* name, bool* set);
     Qt::CheckState bool2check(bool checked);
     void LoadSettings();
-    void AddRangeToList(RangeStruct range);
+    void AddExceptionFilterToList(ExceptionFilter filter);
+    void OnExceptionFilterSelectionChanged(QListWidgetItem* selected);
+    void OnCurrentExceptionFilterSettingsChanged();
+    void UpdateExceptionListWidget();
 };
 
 #endif // SETTINGSDIALOG_H

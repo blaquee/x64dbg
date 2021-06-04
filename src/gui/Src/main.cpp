@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
     application.installNativeEventFilter(eventFilter);
 #endif
 
-    // Get the hidden language setting (for testers)
+    // Get the language setting
     if(!BridgeSettingGet("Engine", "Language", currentLocale) || !isValidLocale(currentLocale))
     {
         QStringList uiLanguages = QLocale::system().uiLanguages();
@@ -106,6 +106,11 @@ int main(int argc, char* argv[])
     // load config file + set config font
     mConfiguration = new Configuration;
     application.setFont(ConfigFont("Application"));
+
+    // Set configured link color
+    QPalette appPalette = application.palette();
+    appPalette.setColor(QPalette::Link, ConfigColor("LinkColor"));
+    application.setPalette(appPalette);
 
     // Register custom data types
     qRegisterMetaType<dsint>("dsint");

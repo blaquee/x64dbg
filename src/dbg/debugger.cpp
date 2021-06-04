@@ -52,7 +52,7 @@ static bool bIsAttached = false;
 static bool bSkipExceptions = false;
 static duint skipExceptionCount = 0;
 static bool bFreezeStack = false;
-static std::vector<ExceptionRange> ignoredExceptionRange;
+static std::vector<ExceptionFilter> exceptionFilters;
 static HANDLE hEvent = 0;
 static duint tidToResume = 0;
 static HANDLE hMemMapThread = 0;
@@ -331,26 +331,43 @@ void dbgsetfreezestack(bool freeze)
     bFreezeStack = freeze;
 }
 
-void dbgclearignoredexceptions()
+void dbgclearexceptionfilters()
 {
-    ignoredExceptionRange.clear();
+    exceptionFilters.clear();
 }
 
-void dbgaddignoredexception(ExceptionRange range)
+void dbgaddexceptionfilter(ExceptionFilter filter)
 {
-    ignoredExceptionRange.push_back(range);
+    exceptionFilters.push_back(filter);
 }
 
-bool dbgisignoredexception(unsigned int exception)
+const ExceptionFilter & dbggetexceptionfilter(unsigned int exception)
 {
-    for(unsigned int i = 0; i < ignoredExceptionRange.size(); i++)
+    for(unsigned int i = 0; i < exceptionFilters.size(); i++)
     {
-        unsigned int curStart = ignoredExceptionRange.at(i).start;
-        unsigned int curEnd = ignoredExceptionRange.at(i).end;
+        const ExceptionFilter & filter = exceptionFilters.at(i);
+        unsigned int curStart = filter.range.start;
+        unsigned int curEnd = filter.range.end;
         if(exception >= curStart && exception <= curEnd)
-            return true;
+            return filter;
     }
-    return false;
+
+    // no filter found, return the catch-all filter for unknown exceptions
+    for(unsigned int i = 0; i < exceptionFilters.size(); i++)
+    {
+        const ExceptionFilter & filter = exceptionFilters.at(i);
+        if(filter.range.start == 0 && filter.range.start == filter.range.end)
+            return filter;
+    }
+
+    // the unknown exceptions filter is not yet present in settings, add it now
+    ExceptionFilter unknownExceptionsFilter;
+    unknownExceptionsFilter.range.start = unknownExceptionsFilter.range.end = 0;
+    unknownExceptionsFilter.breakOn = ExceptionBreakOn::FirstChance;
+    unknownExceptionsFilter.logException = true;
+    unknownExceptionsFilter.handledBy = ExceptionHandledBy::Debuggee;
+    exceptionFilters.push_back(unknownExceptionsFilter);
+    return exceptionFilters.back();
 }
 
 bool dbgcmdnew(const char* name, CBCOMMAND cbCommand, bool debugonly)
@@ -760,7 +777,14 @@ static void handleBreakCondition(const BREAKPOINT & bp, const void* ExceptionAdd
     if(doBreak)
     {
         if(bp.singleshoot)
+        {
             BpDelete(bp.addr, bp.type);
+            if(bp.type == BPHARDWARE)  // Remove this singleshoot hardware breakpoint
+            {
+                if(TITANDRXVALID(bp.titantype) && !DeleteHardwareBreakPoint(TITANGETDRX(bp.titantype)))
+                    dprintf(QT_TRANSLATE_NOOP("DBG", "Delete hardware breakpoint failed: %p (DeleteHardwareBreakPoint)\n"), bp.addr);
+            }
+        }
         if(!bp.silent)
         {
             switch(bp.type)
@@ -859,7 +883,7 @@ static void cbGenericBreakpoint(BP_TYPE bptype, void* ExceptionAddress = nullptr
     EXCLUSIVE_RELEASE();
 
     if(bptype != BPDLL && bptype != BPEXCEPTION)
-        bp.addr += ModBaseFromAddr(CIP);
+        bp.addr += ModBaseFromName(bp.mod);
     bp.active = true; //a breakpoint that has been hit is active
 
     varset("$breakpointcounter", bp.hitcount, true); //save the breakpoint counter as a variable
@@ -938,16 +962,19 @@ static void cbGenericBreakpoint(BP_TYPE bptype, void* ExceptionAddress = nullptr
 
 void cbUserBreakpoint()
 {
+    lastExceptionInfo = ((DEBUG_EVENT*)GetDebugData())->u.Exception;
     cbGenericBreakpoint(BPNORMAL);
 }
 
 void cbHardwareBreakpoint(void* ExceptionAddress)
 {
+    lastExceptionInfo = ((DEBUG_EVENT*)GetDebugData())->u.Exception;
     cbGenericBreakpoint(BPHARDWARE, ExceptionAddress);
 }
 
 void cbMemoryBreakpoint(void* ExceptionAddress)
 {
+    lastExceptionInfo = ((DEBUG_EVENT*)GetDebugData())->u.Exception;
     cbGenericBreakpoint(BPMEMORY, ExceptionAddress);
 }
 
@@ -1205,26 +1232,24 @@ static void cbRtrFinalStep(bool checkRepeat = false)
 void cbRtrStep()
 {
     hActiveThread = ThreadGetHandle(((DEBUG_EVENT*)GetDebugData())->dwThreadId);
-    unsigned char ch = 0x90;
+    unsigned char data[MAX_DISASM_BUFFER];
+    memset(data, 0x90, sizeof(data));
     duint cip = GetContextDataEx(hActiveThread, UE_CIP);
     duint csp = GetContextDataEx(hActiveThread, UE_CSP);
-    MemRead(cip, &ch, 1);
+    MemRead(cip, data, sizeof(data));
     if(bTraceRecordEnabledDuringTrace)
         _dbg_dbgtraceexecute(cip);
     if(mRtrPreviousCSP <= csp) //"Run until return" should break only if RSP is bigger than or equal to current value
     {
-        if(ch == 0xC3 || ch == 0xC2) //retn instruction
+        if(data[0] == 0xC3 || data[0] == 0xC2) //retn instruction
             cbRtrFinalStep(true);
-        else if(ch == 0x26 || ch == 0x36 || ch == 0x2e || ch == 0x3e || (ch >= 0x64 && ch <= 0x67) || ch == 0xf2 || ch == 0xf3 //instruction prefixes
+        else if(data[0] == 0x26 || data[0] == 0x36 || data[0] == 0x2e || data[0] == 0x3e || (data[0] >= 0x64 && data[0] <= 0x67) || data[0] == 0xf2 || data[0] == 0xf3 //instruction prefixes
 #ifdef _WIN64
-                || (ch >= 0x40 && ch <= 0x4f)
+                || (data[0] >= 0x40 && data[0] <= 0x4f)
 #endif //_WIN64
                )
         {
             Zydis cp;
-            unsigned char data[MAX_DISASM_BUFFER];
-            memset(data, 0, sizeof(data));
-            MemRead(cip, data, MAX_DISASM_BUFFER);
             if(cp.Disassemble(cip, data) && cp.IsRet())
                 cbRtrFinalStep(true);
             else
@@ -1457,11 +1482,21 @@ static void cbCreateProcess(CREATE_PROCESS_DEBUG_INFO* CreateProcessInfo)
     threadInfo.lpStartAddress = CreateProcessInfo->lpStartAddress;
     threadInfo.lpThreadLocalBase = CreateProcessInfo->lpThreadLocalBase;
     ThreadCreate(&threadInfo);
+
+    hActiveThread = ThreadGetHandle(((DEBUG_EVENT*)GetDebugData())->dwThreadId);
 }
 
 static void cbExitProcess(EXIT_PROCESS_DEBUG_INFO* ExitProcess)
 {
     dprintf(QT_TRANSLATE_NOOP("DBG", "Process stopped with exit code 0x%X\n"), ExitProcess->dwExitCode);
+    const bool breakHere = settingboolget("Events", "NtTerminateProcess");
+    if(breakHere)
+    {
+        // lock
+        DebugUpdateGuiSetStateAsync(GetContextDataEx(hActiveThread, UE_CIP), true);
+        lock(WAITID_RUN);
+    }
+    // plugin callback
     PLUG_CB_EXITPROCESS callbackInfo;
     callbackInfo.ExitProcess = ExitProcess;
     plugincbcall(CB_EXITPROCESS, &callbackInfo);
@@ -1470,6 +1505,12 @@ static void cbExitProcess(EXIT_PROCESS_DEBUG_INFO* ExitProcess)
     dbgcleartracestate();
     dbgClearRtuBreakpoints();
     HistoryClear();
+    if(breakHere)
+    {
+        dbgsetforeground();
+        dbgsetskipexceptions(false);
+        wait(WAITID_RUN);
+    }
 }
 
 static void cbCreateThread(CREATE_THREAD_DEBUG_INFO* CreateThread)
@@ -1615,10 +1656,7 @@ static void cbSystemBreakpoint(void* ExceptionData) // TODO: System breakpoint e
     GuiUpdateAllViews();
 
     //log message
-    if(bIsAttached)
-        dputs(QT_TRANSLATE_NOOP("DBG", "Attach breakpoint reached!"));
-    else
-        dputs(QT_TRANSLATE_NOOP("DBG", "System breakpoint reached!"));
+    dputs(QT_TRANSLATE_NOOP("DBG", "System breakpoint reached!"));
     dbgsetskipexceptions(false); //we are not skipping first-chance exceptions
 
     //plugin callbacks
@@ -1633,7 +1671,7 @@ static void cbSystemBreakpoint(void* ExceptionData) // TODO: System breakpoint e
         dputs(QT_TRANSLATE_NOOP("DBG", "It has been detected that the debuggee entry point is in the MZ header of the executable. This will cause strange behavior, so the system breakpoint has been enabled regardless of your setting. Be careful!"));
         systemBreakpoint = true;
     }
-    if(bIsAttached ? settingboolget("Events", "AttachBreakpoint") : systemBreakpoint)
+    if(systemBreakpoint)
     {
         //lock
         GuiSetDebugStateAsync(paused);
@@ -1689,7 +1727,9 @@ static void cbLoadDll(LOAD_DLL_DEBUG_INFO* LoadDll)
     }
     DebugUpdateBreakpointsViewAsync();
 
-    if(settingboolget("Events", "TlsCallbacks"))
+    int party = ModGetParty(duint(base));
+
+    if(settingboolget("Events", "TlsCallbacks") && party != mod_system || settingboolget("Events", "TlsCallbacksSystem") && party == mod_system)
     {
         SHARED_ACQUIRE(LockModules);
         auto modInfo = ModInfoFromAddr(duint(base));
@@ -1714,7 +1754,7 @@ static void cbLoadDll(LOAD_DLL_DEBUG_INFO* LoadDll)
 
     auto breakOnDll = dbghandledllbreakpoint(modname, true);
 
-    if((breakOnDll || settingboolget("Events", "DllEntry")) && !bAlreadySetEntry)
+    if((breakOnDll || (settingboolget("Events", "DllEntry") && party != mod_system || settingboolget("Events", "DllEntrySystem") && party == mod_system)) && !bAlreadySetEntry)
     {
         auto entry = ModEntryFromAddr(duint(base));
         if(entry)
@@ -1730,7 +1770,6 @@ static void cbLoadDll(LOAD_DLL_DEBUG_INFO* LoadDll)
             cookie.HandleNtdllLoad(bIsAttached);
         if(settingboolget("Misc", "TransparentExceptionStepping"))
             exceptionDispatchAddr = DbgValFromString("ntdll:KiUserExceptionDispatcher");
-
         //set debug flags
         if(dwDebugFlags != 0)
         {
@@ -1798,7 +1837,7 @@ static void cbLoadDll(LOAD_DLL_DEBUG_INFO* LoadDll)
     {
         cbGenericBreakpoint(BPDLL, DLLDebugFileName);
     }
-    else if(settingboolget("Events", "DllLoad"))
+    else if(settingboolget("Events", "DllLoad") && party != mod_system || settingboolget("Events", "DllLoadSystem") && party == mod_system)
     {
         //update GUI
         DebugUpdateGuiSetStateAsync(GetContextDataEx(hActiveThread, UE_CIP), true);
@@ -1824,6 +1863,7 @@ static void cbUnloadDll(UNLOAD_DLL_DEBUG_INFO* UnloadDll)
     char modname[256] = "???";
     if(ModNameFromAddr((duint)base, modname, true))
         BpEnumAll(cbRemoveModuleBreakpoints, modname, duint(base));
+    int party = ModGetParty(duint(base));
     DebugUpdateBreakpointsViewAsync();
     dprintf(QT_TRANSLATE_NOOP("DBG", "DLL Unloaded: %p %s\n"), base, modname);
 
@@ -1831,7 +1871,7 @@ static void cbUnloadDll(UNLOAD_DLL_DEBUG_INFO* UnloadDll)
     {
         cbGenericBreakpoint(BPDLL, modname);
     }
-    else if(settingboolget("Events", "DllUnload"))
+    else if(settingboolget("Events", "DllUnload") && party != mod_system || settingboolget("Events", "DllUnloadSystem") && party == mod_system)
     {
         //update GUI
         DebugUpdateGuiSetStateAsync(GetContextDataEx(hActiveThread, UE_CIP), true);
@@ -1894,6 +1934,20 @@ static void cbOutputDebugString(OUTPUT_DEBUG_STRING_INFO* DebugString)
     }
 }
 
+static bool dbgdetachDisableAllBreakpoints(const BREAKPOINT* bp)
+{
+    if(bp->enabled)
+    {
+        if(bp->type == BPNORMAL)
+            DeleteBPX(bp->addr);
+        else if(bp->type == BPMEMORY)
+            RemoveMemoryBPX(bp->addr, 0);
+        else if(bp->type == BPHARDWARE && TITANDRXVALID(bp->titantype))
+            DeleteHardwareBreakPoint(TITANGETDRX(bp->titantype));
+    }
+    return true;
+}
+
 static void cbException(EXCEPTION_DEBUG_INFO* ExceptionData)
 {
     hActiveThread = ThreadGetHandle(((DEBUG_EVENT*)GetDebugData())->dwThreadId);
@@ -1931,29 +1985,39 @@ static void cbException(EXCEPTION_DEBUG_INFO* ExceptionData)
             }
         }
     }
-    if(bVerboseExceptionLogging)
+    const ExceptionFilter & filter = dbggetexceptionfilter(ExceptionCode);
+    if(bVerboseExceptionLogging && filter.logException)
         DbgCmdExecDirect("exinfo"); //show extended exception information
     auto exceptionName = ExceptionCodeToName(ExceptionCode);
     if(!exceptionName.size()) //if no exception was found, try the error codes (RPC_S_*)
         exceptionName = ErrorCodeToName(ExceptionCode);
     if(ExceptionData->dwFirstChance) //first chance exception
     {
-        if(exceptionName.size())
-            dprintf(QT_TRANSLATE_NOOP("DBG", "First chance exception on %p (%.8X, %s)!\n"), addr, ExceptionCode, exceptionName.c_str());
-        else
-            dprintf(QT_TRANSLATE_NOOP("DBG", "First chance exception on %p (%.8X)!\n"), addr, ExceptionCode);
-        SetNextDbgContinueStatus(DBG_EXCEPTION_NOT_HANDLED);
-        if((bSkipExceptions || dbgisignoredexception(ExceptionCode)) && (!maxSkipExceptionCount || ++skipExceptionCount < maxSkipExceptionCount))
+        if(filter.logException)
+        {
+            if(exceptionName.size())
+                dprintf(QT_TRANSLATE_NOOP("DBG", "First chance exception on %p (%.8X, %s)!\n"), addr, ExceptionCode, exceptionName.c_str());
+            else
+                dprintf(QT_TRANSLATE_NOOP("DBG", "First chance exception on %p (%.8X)!\n"), addr, ExceptionCode);
+        }
+        SetNextDbgContinueStatus(filter.handledBy == ExceptionHandledBy::Debuggee ? DBG_EXCEPTION_NOT_HANDLED : DBG_CONTINUE);
+        if((bSkipExceptions || filter.breakOn != ExceptionBreakOn::FirstChance) && (!maxSkipExceptionCount || ++skipExceptionCount < maxSkipExceptionCount))
             return;
     }
     else //lock the exception
     {
-        if(exceptionName.size())
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Last chance exception on %p (%.8X, %s)!\n"), addr, ExceptionCode, exceptionName.c_str());
-        else
-            dprintf(QT_TRANSLATE_NOOP("DBG", "Last chance exception on %p (%.8X)!\n"), addr, ExceptionCode);
-        SetNextDbgContinueStatus(DBG_CONTINUE);
+        if(filter.logException)
+        {
+            if(exceptionName.size())
+                dprintf(QT_TRANSLATE_NOOP("DBG", "Last chance exception on %p (%.8X, %s)!\n"), addr, ExceptionCode, exceptionName.c_str());
+            else
+                dprintf(QT_TRANSLATE_NOOP("DBG", "Last chance exception on %p (%.8X)!\n"), addr, ExceptionCode);
+        }
+        // DBG_EXCEPTION_NOT_HANDLED kills the process on a last chance exception, so only pass this if the user really asked for it
+        SetNextDbgContinueStatus(filter.breakOn == ExceptionBreakOn::DoNotBreak && filter.handledBy == ExceptionHandledBy::Debuggee ? DBG_EXCEPTION_NOT_HANDLED : DBG_CONTINUE);
     }
+    if(filter.breakOn == ExceptionBreakOn::DoNotBreak)
+        return;
 
     DebugUpdateGuiSetStateAsync(GetContextDataEx(hActiveThread, UE_CIP), true);
     //lock
@@ -1991,6 +2055,20 @@ static void cbAttachDebugger()
         tidToResume = 0;
     }
     varset("$pid", fdProcessInfo->dwProcessId, true);
+
+    //Get on top of things
+    SetForegroundWindow(GuiGetWindowHandle());
+
+    // Update GUI (this should be the first triggered event)
+    duint cip = GetContextDataEx(hActiveThread, UE_CIP);
+    GuiDumpAt(MemFindBaseAddr(cip, 0, true)); //dump somewhere
+    DebugUpdateGuiSetStateAsync(cip, true, running);
+
+    MemInitRemoteProcessCookie(cookie.cookie);
+    GuiUpdateAllViews();
+
+    dputs(QT_TRANSLATE_NOOP("DBG", "Attached to process!"));
+    dbgsetskipexceptions(false); //we are not skipping first-chance exceptions
 }
 
 cmdline_qoutes_placement_t getqoutesplacement(const char* cmdline)
@@ -2576,27 +2654,23 @@ static void* InitDLLDebugW(const wchar_t* szFileName, const wchar_t* szCommandLi
     return ReturnValue;
 }
 
-static void debugLoopFunction(void* lpParameter, bool attach)
+static void debugLoopFunction(INIT_STRUCT* init)
 {
     //initialize variables
-    bIsAttached = attach;
+    bIsAttached = init->attach;
     dbgsetskipexceptions(false);
     bFreezeStack = false;
 
     //prepare attach/createprocess
-    DWORD pid;
-    INIT_STRUCT* init;
-    if(attach)
+    if(init->attach)
     {
         gInitExe = StringUtils::Utf8ToUtf16(szDebuggeePath);
-        pid = DWORD(lpParameter);
         static PROCESS_INFORMATION pi_attached;
         memset(&pi_attached, 0, sizeof(pi_attached));
         fdProcessInfo = &pi_attached;
     }
     else
     {
-        init = (INIT_STRUCT*)lpParameter;
         gInitExe = StringUtils::Utf8ToUtf16(init->exe);
         strcpy_s(szDebuggeePath, init->exe);
     }
@@ -2612,7 +2686,7 @@ static void debugLoopFunction(void* lpParameter, bool attach)
     }
     DbSetPath(nullptr, szDebuggeePath);
 
-    if(!attach)
+    if(!init->attach)
     {
         // Load command line if it exists in DB
         DbLoad(DbLoadSaveType::CommandLine);
@@ -2693,6 +2767,10 @@ static void debugLoopFunction(void* lpParameter, bool attach)
         gInitDir.clear();
     }
 
+    // signal that fdProcessInfo has been set
+    SetEvent(init->event);
+    init->event = nullptr;
+
     //set custom handlers
     SetCustomHandler(UE_CH_CREATEPROCESS, (void*)cbCreateProcess);
     SetCustomHandler(UE_CH_EXITPROCESS, (void*)cbExitProcess);
@@ -2725,10 +2803,10 @@ static void debugLoopFunction(void* lpParameter, bool attach)
     plugincbcall(CB_INITDEBUG, &initInfo);
 
     //call plugin callback (attach)
-    if(attach)
+    if(init->attach)
     {
         PLUG_CB_ATTACH attachInfo;
-        attachInfo.dwProcessId = (DWORD)pid;
+        attachInfo.dwProcessId = init->pid;
         plugincbcall(CB_ATTACH, &attachInfo);
     }
 
@@ -2736,9 +2814,9 @@ static void debugLoopFunction(void* lpParameter, bool attach)
     DbLoad(DbLoadSaveType::DebugData);
 
     //run debug loop (returns when process debugging is stopped)
-    if(attach)
+    if(init->attach)
     {
-        if(AttachDebugger(pid, true, fdProcessInfo, (void*)cbAttachDebugger) == false)
+        if(AttachDebugger(init->pid, true, fdProcessInfo, (void*)cbAttachDebugger) == false)
         {
             String error = stringformatinline(StringUtils::sprintf("{winerror@%d}", GetLastError()));
             dprintf(QT_TRANSLATE_NOOP("DBG", "Attach to process failed! GetLastError() = %s\n"), error.c_str());
@@ -2824,16 +2902,24 @@ void dbgsetforeground()
         SetForegroundWindow(GuiGetWindowHandle());
 }
 
-DWORD WINAPI threadDebugLoop(void* lpParameter)
+void dbgcreatedebugthread(INIT_STRUCT* init)
 {
-    debugLoopFunction(lpParameter, false);
-    return 0;
-}
+    auto event = init->event = CreateEventW(nullptr, false, false, nullptr);
+    hDebugLoopThread = CreateThread(nullptr, 0, [](LPVOID lpParameter) -> DWORD
+    {
+        auto init = (INIT_STRUCT*)lpParameter;
+        debugLoopFunction(init);
 
-DWORD WINAPI threadAttachLoop(void* lpParameter)
-{
-    debugLoopFunction(lpParameter, true);
-    return 0;
+        // Set the event in case debugLoopFunction returned early to prevent a deadlock
+        if(init->event)
+        {
+            SetEvent(init->event);
+            init->event = nullptr;
+        }
+        return 0;
+    }, init, 0, nullptr);
+    WaitForSingleObject(event, INFINITE);
+    CloseHandle(event);
 }
 
 bool dbgrestartadmin()

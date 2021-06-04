@@ -91,7 +91,7 @@ void CPUInfoBox::clear()
     setInfoLine(3, "");
 }
 
-static QString formatSSEOperand(const QByteArray & data, uint8_t vectorType)
+QString CPUInfoBox::formatSSEOperand(const QByteArray & data, unsigned char vectorType)
 {
     QString hex;
     bool isXMMdecoded = false;
@@ -110,7 +110,7 @@ static QString formatSSEOperand(const QByteArray & data, uint8_t vectorType)
         }
         else if(data.size() == 4)
         {
-            hex = QString::number(((const float*)data.constData())[0]);
+            hex = ToFloatString(data.constData());
             isXMMdecoded = true;
         }
         break;
@@ -127,7 +127,7 @@ static QString formatSSEOperand(const QByteArray & data, uint8_t vectorType)
         }
         else if(data.size() == 8)
         {
-            hex = QString::number(((const double*)data.constData())[0]);
+            hex = ToDoubleString(data.constData());
             isXMMdecoded = true;
         }
         break;
@@ -188,7 +188,7 @@ void CPUInfoBox::disasmSelectionChanged(dsint parVA)
 
     for(int i = 0, j = start; i < instr.argcount && j < 2; i++)
     {
-        DISASM_ARG arg = instr.arg[i];
+        const DISASM_ARG & arg = instr.arg[i];
         QString argMnemonic = QString(arg.mnemonic);
         if(bUpper)
             argMnemonic = argMnemonic.toUpper();

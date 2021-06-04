@@ -83,6 +83,7 @@ public slots:
     void execTRWord();
     void execTRNone();
     void displayCpuWidget();
+    void displayCpuWidgetShowCpu();
     void displaySymbolWidget();
     void displaySourceViewWidget();
     void displayReferencesWidget();
@@ -195,6 +196,7 @@ private:
 
     QAction* actionManageFavourites;
 
+    void updateDarkTitleBar();
     void updateMRUMenu();
     void setupLanguagesMenu();
     void setupThemesMenu();
@@ -274,6 +276,7 @@ protected:
 
 private slots:
     void setupLanguagesMenu2();
+    void updateStyle();
 
     void on_actionFaq_triggered();
     void on_actionReloadStylesheet_triggered();
